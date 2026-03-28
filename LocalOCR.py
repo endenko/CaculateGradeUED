@@ -17,11 +17,10 @@ UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# 🎯 ĐƯỜNG DẪN TESSERACT LOCAL (Cho Ảnh Máy Tính)
-# Sensei kiểm tra lại đúng đường dẫn máy mình chưa nhé!
+# 🎯 ĐƯỜNG DẪN TESSERACT LOCAL
 pytesseract.pytesseract.tesseract_cmd = r'D:\OCR\tesseract.exe'
 
-# 🎯 ĐƯỜNG DẪN GOOGLE API (Cho Ảnh Viết Tay)
+# 🎯 ĐƯỜNG DẪN GOOGLE API
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = r"D:\Python_Code\AI_Project\App_Python\key.json"
 
 # --- KẾT NỐI SQL ---
@@ -35,10 +34,8 @@ def get_db_connection():
         print(f"❌ LỖI KẾT NỐI DB: {e}"); return None
 
 # ========================================================
-# 👁️ LÕI THỊ GIÁC HYBRID (LAI GIỮA LOCAL VÀ CLOUD)
+# 👁️ LÕI THỊ GIÁC HYBRID
 # ========================================================
-
-# 1. Quét Local bằng Tesseract (Dùng cho Ảnh Máy Tính)
 def perform_local_ocr_computer(image_path):
     img = cv2.imread(image_path)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -59,7 +56,6 @@ def perform_local_ocr_computer(image_path):
                 word_list.append({'text': text, 'x': x, 'y': y})
     return word_list
 
-# 2. Quét Cloud bằng Google Vision (Dùng cho Ảnh Viết Tay)
 def perform_cloud_ocr_handwriting(image_path):
     client = vision.ImageAnnotatorClient()
     with io.open(image_path, 'rb') as image_file: content = image_file.read()
@@ -77,9 +73,6 @@ def perform_cloud_ocr_handwriting(image_path):
         })
     return word_list
 
-# ========================================================
-# 🧠 THUẬT TOÁN GOM DÒNG TỌA ĐỘ
-# ========================================================
 def reconstruct_lines(word_list, mode):
     if not word_list: return []
     word_list.sort(key=lambda k: k['y'])
@@ -98,16 +91,23 @@ def reconstruct_lines(word_list, mode):
     return lines
 
 # ========================================================
-# 🛡️ TRUNG TÂM SỬA TÊN & QUY ĐỔI ĐIỂM
+# 🛡️ TRUNG TÂM SỬA TÊN & LẤY TÍN CHỈ CỨU HỘ
 # ========================================================
 def no_accent_vietnamese(s):
-    s = re.sub(r'[àáạảãâầấậẩẫăằắặẳẵ]', 'a', s); s = re.sub(r'[ÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴ]', 'A', s)
-    s = re.sub(r'[èéẹẻẽêềếệểễ]', 'e', s); s = re.sub(r'[ÈÉẸẺẼÊỀẾỆỂỄ]', 'E', s)
-    s = re.sub(r'[òóọỏõôồốộổỗơờớợởỡ]', 'o', s); s = re.sub(r'[ÒÓỌỎÕÔỒỐỘỔNƠỜỚỢỞỠ]', 'O', s)
-    s = re.sub(r'[ìíịỉĩ]', 'i', s); s = re.sub(r'[ÌÍỊỈĨ]', 'I', s)
-    s = re.sub(r'[ùúụủũưừứựửữ]', 'u', s); s = re.sub(r'[ÙÚỤỦŨƯỪỨỰỬỮ]', 'U', s)
-    s = re.sub(r'[ỳýỵỷỹ]', 'y', s); s = re.sub(r'[ỲÝỴỶỸ]', 'Y', s)
-    s = re.sub(r'[đ]', 'd', s); s = re.sub(r'[Đ]', 'D', s)
+    s = re.sub(r'[àáạảãâầấậẩẫăằắặẳẵ]', 'a', s)
+    s = re.sub(r'[ÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴ]', 'A', s)
+    s = re.sub(r'[èéẹẻẽêềếệểễ]', 'e', s)
+    s = re.sub(r'[ÈÉẸẺẼÊỀẾỆỂỄ]', 'E', s)
+    s = re.sub(r'[òóọỏõôồốộổỗơờớợởỡ]', 'o', s)
+    s = re.sub(r'[ÒÓỌỎÕÔỒỐỘỔƠỜỚỢỞỠ]', 'O', s) 
+    s = re.sub(r'[ìíịỉĩ]', 'i', s)
+    s = re.sub(r'[ÌÍỊỈĨ]', 'I', s)
+    s = re.sub(r'[ùúụủũưừứựửữ]', 'u', s)
+    s = re.sub(r'[ÙÚỤỦŨƯỪỨỰỬỮ]', 'U', s)
+    s = re.sub(r'[ỳýỵỷỹ]', 'y', s)
+    s = re.sub(r'[ỲÝỴỶỸ]', 'Y', s)
+    s = re.sub(r'[đ]', 'd', s)
+    s = re.sub(r'[Đ]', 'D', s)
     return s
 
 def quy_doi_chuan(diem_so):
@@ -127,42 +127,52 @@ def quy_doi_chuan(diem_so):
 
 def auto_correct_universal(raw_name, mode):
     conn = get_db_connection()
-    if not conn: return raw_name, "0%"
+    if not conn: return raw_name, "0%", 3
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT ten_mon FROM danh_muc_mon")
-        db_subjects = [row[0] for row in cursor.fetchall()]
+        # 🚨 Lấy cả TÍN CHỈ từ DB để dự phòng ngài lười viết
+        cursor.execute("SELECT ten_mon, tin_chi FROM danh_muc_mon")
+        db_subjects = cursor.fetchall()
         
-        best_match = raw_name; highest_ratio = 0.0
+        best_match = raw_name; highest_ratio = 0.0; best_credit = 3
         
         raw_lower = raw_name.lower()
         if 'c++' in raw_lower or 'cet' in raw_lower or 'ctt' in raw_lower or 'c t' in raw_lower:
-            return "Lập trình C++", "100%"
+            return "Lập trình C++", "100%", 3
 
-        clean_raw = re.sub(r'www\.\S+', '', raw_name) 
-        clean_raw = re.sub(r'[^\w\s\+#]', '', clean_raw).lower().strip()
+        raw_no_accent = no_accent_vietnamese(raw_name).lower()
+        clean_raw = re.sub(r'www\.\S+', '', raw_no_accent) 
+        clean_raw = re.sub(r'[^\w\s\+#]', '', clean_raw).strip()
 
-        for subject in db_subjects:
-            clean_sub = re.sub(r'[^\w\s\+#]', '', subject).lower()
+        for row in db_subjects:
+            subject = row[0]
+            db_credit = row[1]
+            
+            sub_no_accent = no_accent_vietnamese(subject).lower()
+            clean_sub = re.sub(r'[^\w\s\+#]', '', sub_no_accent)
+            
             ratio = SequenceMatcher(None, clean_raw, clean_sub).ratio()
             if ratio > highest_ratio:
-                highest_ratio = ratio; best_match = subject
+                highest_ratio = ratio
+                best_match = subject 
+                best_credit = db_credit # Lưu lại tín chỉ cứu hộ
         
         similarity_string = f"{int(highest_ratio * 100)}%"
         
-        # 🚨 HẠ NGƯỠNG MÁY TÍNH XUỐNG 60% ĐỂ CỨU MÔN "MẠNG MÁY TÍNH" (70%)
-        threshold = 0.60 if mode == 'computer' else 0.25
+        threshold = 0.60 if mode == 'computer' else 0.20
         
-        if highest_ratio >= threshold: return best_match, similarity_string
-        else: return raw_name, similarity_string 
+        if highest_ratio >= threshold: 
+            return best_match, similarity_string, best_credit
+        else: 
+            return raw_name, similarity_string, best_credit
 
     except Exception as e: print("Lỗi SQL:", e)
     finally:
         if conn: conn.close()
-    return raw_name, "0%"
+    return raw_name, "0%", 3
 
 # ========================================================
-# 💻 PARSER MÁY TÍNH (TESSERACT LOCAL)
+# 💻 PARSER MÁY TÍNH
 # ========================================================
 def parse_computer(lines):
     results = []
@@ -179,10 +189,9 @@ def parse_computer(lines):
             tin_chi_ocr = match.group(3) if mode == "A" else match.group(2)
             end_pos = match.end()
 
-            # 🚨 SIẾT LƯỚI LỌC MÃ HỌC PHẦN ĐẦU DÒNG (Chống OCR đọc sai số)
-            raw_name = re.sub(r'^\d+\s+\d{5,10}\s+', '', raw_name) # Xóa dạng "5 31231456 "
-            raw_name = re.sub(r'^\d{5,10}\s+', '', raw_name)       # Xóa dạng "3123145 " (Mất STT)
-            raw_name = re.sub(r'^\d+\s+', '', raw_name).strip()    # Xóa STT mồ côi
+            raw_name = re.sub(r'^\d+\s+\d{5,10}\s+', '', raw_name)
+            raw_name = re.sub(r'^\d{5,10}\s+', '', raw_name)       
+            raw_name = re.sub(r'^\d+\s+', '', raw_name).strip()    
 
             name_check = no_accent_vietnamese(raw_name).lower()
             blacklist = ["trung binh", "tich luy", "ren luyen", "tong so", "he 10", "he 4", "giao duc the chat", "quoc phong"]
@@ -205,7 +214,8 @@ def parse_computer(lines):
                 else: diem_chu = diem_chu_ocr
             else: diem_chu = diem_chu_ocr
 
-            ten_mon_chuan, similarity_pct = auto_correct_universal(raw_name, 'computer')
+            # 🚨 Nhận 3 biến trả về từ hàm sửa lỗi
+            ten_mon_chuan, similarity_pct, db_credit = auto_correct_universal(raw_name, 'computer')
             if len(ten_mon_chuan) < 2: continue
             
             results.append({
@@ -218,18 +228,19 @@ def parse_computer(lines):
     return results
 
 # ========================================================
-# ✍️ PARSER VIẾT TAY (GOOGLE VISION API)
+# ✍️ PARSER VIẾT TAY (CHỐNG LƯỜI V38)
 # ========================================================
 def parse_handwriting(lines):
     results = []
-    pattern = re.compile(r"(.+?)\s+(\d+)\s+(\d+[\.,]?\d*)(.*)")
+    # 🚨 REGEX THÔNG MINH MỚI: Tín chỉ (Nhóm 2) giờ là KHÔNG BẮT BUỘC (?:...)?
+    pattern = re.compile(r"(.+?)\s+(?:(\d)\s+)?(\d{1,2}(?:[\.,]\d+)?)(.*)")
 
     for line in lines:
         line = line.strip()
         match = pattern.search(line)
         if match:
             raw_name_ocr = match.group(1).strip()
-            tin_chi_ocr = match.group(2)
+            tin_chi_ocr = match.group(2) # Sẽ bằng None nếu ngài lười không ghi tín chỉ
             diem_10_str = match.group(3)
             phan_duoi = match.group(4) or "" 
             
@@ -241,7 +252,11 @@ def parse_handwriting(lines):
                 if dau_kem_theo in ['T', 'Y', '*']: dau_kem_theo = '+'
                 diem_chu_ocr = chu_cai + dau_kem_theo
 
-            ten_mon_chuan, similarity_pct = auto_correct_universal(raw_name_ocr, 'handwriting')
+            # Đi tìm cứu viện từ SQL
+            ten_mon_chuan, similarity_pct, db_credit = auto_correct_universal(raw_name_ocr, 'handwriting')
+            
+            # 🚨 LUẬT BÙ ĐẮP: Có chữ số thì xài chữ số, lười không ghi thì xài Tín chỉ của SQL!
+            final_tin_chi = int(tin_chi_ocr) if tin_chi_ocr is not None else db_credit
             
             if diem_chu_ocr: final_diem_he_4 = diem_chu_ocr 
             else:
@@ -255,7 +270,7 @@ def parse_handwriting(lines):
                 "raw_name": raw_name_ocr,
                 "ten_mon": ten_mon_chuan,      
                 "percentage": similarity_pct,  
-                "tin_chi": int(tin_chi_ocr), 
+                "tin_chi": final_tin_chi, 
                 "diem_he_4": final_diem_he_4   
             })
     return results
@@ -294,12 +309,10 @@ def process_ocr():
         file.save(path)
         try:
             if mode == 'handwriting':
-                print("📝 Gọi GOOGLE VISION cho chữ Viết tay!")
                 word_list = perform_cloud_ocr_handwriting(path)
                 lines = reconstruct_lines(word_list, mode)
                 extracted_data = parse_handwriting(lines) 
             else:
-                print("💻 Gọi TESSERACT LOCAL cho chữ Máy tính!")
                 word_list = perform_local_ocr_computer(path)
                 lines = reconstruct_lines(word_list, mode)
                 extracted_data = parse_computer(lines)
@@ -307,6 +320,36 @@ def process_ocr():
             return jsonify({"success": True, "data": extracted_data})
         except Exception as e:
             return jsonify({"success": False, "error": str(e)}) 
+    return jsonify({"success": False, "error": "File không hợp lệ"})
+
+@app.route('/api/scan_detail_score', methods=['POST'])
+def scan_detail_score():
+    if 'file_anh' not in request.files: return jsonify({"success": False, "error": "Chưa chọn file"})
+    file = request.files['file_anh']
+    if file:
+        filename = secure_filename(file.filename)
+        path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(path)
+        try:
+            img = cv2.imread(path)
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            img_resized = cv2.resize(gray, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+            processed_img = cv2.threshold(img_resized, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+            
+            config = '--oem 3 --psm 6'
+            text = pytesseract.image_to_string(processed_img, lang='vie+eng', config=config)
+            
+            bp_match = re.search(r'bộ phận[^\d]*(\d+[\.,]\d+)', text, re.IGNORECASE)
+            gk_match = re.search(r'giữa kỳ[^\d]*(\d+[\.,]\d+)', text, re.IGNORECASE)
+            
+            bp = float(bp_match.group(1).replace(',', '.')) if bp_match else None
+            gk = float(gk_match.group(1).replace(',', '.')) if gk_match else None
+            
+            if bp is None and gk is None:
+                return jsonify({"success": False, "error": "Không tìm thấy Điểm Bộ Phận hay Giữa Kỳ!"})
+                
+            return jsonify({"success": True, "bp": bp, "gk": gk})
+        except Exception as e: return jsonify({"success": False, "error": str(e)}) 
     return jsonify({"success": False, "error": "File không hợp lệ"})
 
 if __name__ == '__main__':
