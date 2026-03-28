@@ -1,0 +1,174 @@
+:root {
+    --primary: #d63384;
+    --bg-soft: #fff0f6;
+}
+
+body {
+    background: #f8f9fa;
+    font-family: 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    padding-bottom: 2rem;
+}
+
+.card {
+    border: none;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    transition: 0.3s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+.card-input-section {
+    position: relative;
+    z-index: 1050;
+}
+
+.btn-kanna {
+    background: var(--primary);
+    color: white;
+    border-radius: 12px;
+    font-weight: 600;
+    border: none;
+}
+
+.btn-kanna:hover {
+    background: #b02a6b;
+    color: white;
+}
+
+.suggestions-box {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 9999;
+    background: white;
+    width: 100%;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    max-height: 250px;
+    overflow-y: auto;
+    display: none;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    margin-top: 4px;
+}
+
+.suggestion-item {
+    padding: 10px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background 0.2s;
+}
+
+.suggestion-item:last-child {
+    border-bottom: none;
+}
+
+.suggestion-item:hover {
+    background: #f8f9fa;
+    color: var(--primary);
+}
+
+.score-box {
+    text-align: center;
+    padding: 15px;
+    border-radius: 12px;
+    position: relative;
+    overflow: hidden;
+}
+
+.score-box.old {
+    background: #ffe3e3;
+    color: #dc3545;
+}
+
+.score-box.new {
+    background: #d1e7dd;
+    color: #198754;
+    border: 2px solid #198754;
+}
+
+.score-box.diff {
+    background: #fff3cd;
+    color: #ffc107;
+}
+
+.score-value {
+    font-size: 2.5rem;
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+.score-label {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.8;
+}
+
+.badge-grade {
+    width: 35px;
+    height: 35px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-weight: bold;
+}
+
+.bg-A-plus {
+    background: #198754;
+    color: white;
+    box-shadow: 0 0 8px #198754;
+}
+
+.bg-A {
+    background: #d1e7dd;
+    color: #0f5132;
+}
+
+.bg-B {
+    background: #cfe2ff;
+    color: #084298;
+}
+
+.bg-C {
+    background: #fff3cd;
+    color: #664d03;
+}
+
+.bg-D {
+    background: #f8d7da;
+    color: #842029;
+}
+
+.bg-F {
+    background: #212529;
+    color: white;
+}
+
+.progress {
+    height: 25px;
+    border-radius: 15px;
+    background-color: #e9ecef;
+}
+
+.progress-bar {
+    font-weight: bold;
+    line-height: 25px;
+    background: linear-gradient(45deg, #d63384, #fd7e14);
+}
+
+.suggestion-alert {
+    cursor: pointer;
+    transition: 0.2s;
+    border-left: 4px solid #ffc107;
+    background: #fffdf5;
+}
+
+.suggestion-alert:hover {
+    transform: translateX(5px);
+    background: #fff8db;
+}
