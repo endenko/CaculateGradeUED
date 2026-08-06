@@ -8,6 +8,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     TESSERACT_CMD=/usr/bin/tesseract \
     DB_PATH=/app/data/grade.db \
     OCR_HANDWRITING_ENGINE=paddle \
+    OCR_MODEL_SIZE=hybrid \
     UPLOAD_FOLDER=/app/uploads
 
 # --- System deps: Tesseract + vie language pack, OpenCV/Paddle shared libs ---
@@ -41,4 +42,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
 
 # Re-seed SQLite from the mounted CSV at every start (idempotent), then serve.
 # Edit data/danh_muc_mon.csv on the host and `docker compose restart` to apply.
-CMD ["sh", "-c", "python seed_db.py && exec gunicorn --bind 0.0.0.0:5000 --workers 1 --threads 4 --timeout 300 app:app"]
+# Uses ${PORT:-5000} so Render's injected PORT (10000) is honoured; 5000 for local docker compose.
+CMD ["sh", "-c", "python seed_db.py && exec gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 1 --threads 4 --timeout 300 app:app"]

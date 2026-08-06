@@ -104,20 +104,40 @@ def _paddle_is_available():
 # so the default is 'paddle' for cross-platform stability.
 PADDLE_RUN_MODE = os.environ.get('PADDLE_RUN_MODE', 'paddle').strip().lower()
 
+# Model profile:
+#   'medium' (default) -> PP-OCRv6_medium_det/rec (most accurate, ~134 MB — local/docker-compose)
+#   'hybrid'           -> PP-OCRv5_mobile_det + PP-OCRv6_medium_rec (~84 MB — good accuracy,
+#                         still fits Render's free 512 MB plan)
+#   'mobile'           -> PP-OCRv5_mobile_det/rec  (~10 MB — smallest footprint)
+OCR_MODEL_SIZE = os.environ.get('OCR_MODEL_SIZE', 'medium').strip().lower()
+_MODEL_NAMES = {
+    'medium': (None, None),  # None -> PaddleOCR defaults (PP-OCRv6_medium_*)
+    'hybrid': ('PP-OCRv5_mobile_det', 'PP-OCRv6_medium_rec'),
+    'mobile': ('PP-OCRv5_mobile_det', 'PP-OCRv5_mobile_rec'),
+}
+
 
 def _get_paddle_ocr():
     """Lazy singleton PaddleOCR with the Vietnamese model (lang='vi')."""
     global _paddle_ocr
     if _paddle_ocr is None:
         from paddleocr import PaddleOCR
+        det_name, rec_name = _MODEL_NAMES.get(OCR_MODEL_SIZE, _MODEL_NAMES['medium'])
         engine_config = {'run_mode': PADDLE_RUN_MODE}
+        kwargs = dict(lang='vi', use_doc_orientation_classify=False,
+                      use_doc_unwarping=False, use_textline_orientation=False,
+                      engine_config=engine_config)
+        if det_name:
+            kwargs['text_detection_model_name'] = det_name
+            kwargs['text_recognition_model_name'] = rec_name
         try:
             # Disable the doc-orientation/unwarping extras when supported (faster, smaller image)
-            _paddle_ocr = PaddleOCR(lang='vi', use_doc_orientation_classify=False,
-                                    use_doc_unwarping=False, use_textline_orientation=False,
-                                    engine_config=engine_config)
+            _paddle_ocr = PaddleOCR(**kwargs)
         except TypeError:
-            _paddle_ocr = PaddleOCR(lang='vi', engine_config=engine_config)
+            kwargs.pop('use_doc_orientation_classify', None)
+            kwargs.pop('use_doc_unwarping', None)
+            kwargs.pop('use_textline_orientation', None)
+            _paddle_ocr = PaddleOCR(**kwargs)
     return _paddle_ocr
 
 

@@ -163,6 +163,45 @@ docker compose down -v        # Dừng và xóa hoàn toàn
 
 ---
 
+## ☁️ Triển khai miễn phí lên Render.com (Docker)
+
+Ứng dụng chạy được trên **gói miễn phí** của Render (512 MB RAM). Mặc định image dùng
+cấu hình `OCR_MODEL_SIZE=hybrid` (det nhẹ + rec bản medium, ~84 MB) — cân bằng giữa độ
+chính xác và bộ nhớ.
+
+### Cách 1 — Deploy trực tiếp từ GitHub (nhanh nhất)
+
+1. Push code lên một GitHub repo công khai:
+   ```bash
+   git push origin main
+   ```
+2. Vào https://dashboard.render.com → **New → Web Service**
+3. Dán URL repo (`https://github.com/<user>/<repo>.git`) — Render có thể đọc repo công khai
+   mà không cần kết nối tài khoản GitHub
+4. Render tự nhận Dockerfile. Kiểm tra:
+   - **Runtime**: `Docker`
+   - **Plan**: `Free`
+   - **Health Check Path**: `/health`
+5. **Create Web Service** — đợi build (~5–10 phút), app mở tại `https://<tên-service>.onrender.com`
+
+### Cách 2 — Blueprint (`render.yaml`)
+
+Repo đã kèm `render.yaml` (service tên **UedCalculateGrade**, plan free). Tại dashboard:
+**New → Blueprint** → chọn repo → Render tạo service theo đúng cấu hình.
+
+### Lưu ý khi dùng gói Free
+
+- Instance **ngủ sau 15 phút** không có truy cập; lần mở đầu tiên sau khi ngủ sẽ chậm
+  (30–60s do tải mô hình OCR) — mở lại là nhanh.
+- Bộ nhớ 512 MB: nếu OCR bị kill (OOM), đổi `OCR_MODEL_SIZE=mobile` trong
+  **Dashboard → Service → Environment** rồi Deploy lại.
+- `grade.db` được tạo lại mỗi lần khởi động từ `data/danh_muc_mon.csv` — sửa CSV trong
+  repo rồi push là dữ liệu môn học được cập nhật.
+- Gói miễn phí không hỗ trợ disk bền vững → ảnh upload sẽ mất khi service khởi động lại
+  (không ảnh hưởng chức năng chính).
+
+---
+
 ## 🖥️ Chạy local (không Docker)
 
 ### Yêu cầu

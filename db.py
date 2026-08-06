@@ -19,8 +19,16 @@ DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(os.path.abspath
 SEED_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'danh_muc_mon.csv')
 
 
+def _ensure_db_dir():
+    """Create the parent directory of DB_PATH if missing (e.g. /app/data in Docker)."""
+    d = os.path.dirname(DB_PATH)
+    if d:
+        os.makedirs(d, exist_ok=True)
+
+
 def get_db():
     """Open a connection to the SQLite database (mirrors original get_db_connection())."""
+    _ensure_db_dir()
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn

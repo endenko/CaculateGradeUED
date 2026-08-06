@@ -1,0 +1,25 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# Deploy: push to GitHub, then Render dashboard -> New -> Blueprint -> pick repo,
+# or paste this render.yaml via "New -> Blueprint from repo".
+services:
+  - type: web
+    name: UedCalculateGrade
+    runtime: docker
+    repo: https://github.com/endenko/CaculateGradeUED
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: OCR_HANDWRITING_ENGINE
+        value: paddle
+      - key: OCR_MODEL_SIZE
+        value: hybrid     # PP-OCRv5_mobile_det + PP-OCRv6_medium_rec (~84 MB) — fits free 512 MB plan
+      - key: PADDLE_RUN_MODE
+        value: paddle      # stable; 'mkldnn' is faster on Linux but risky with PP-OCRv6
+      - key: TESSERACT_CMD
+        value: /usr/bin/tesseract
+      - key: DB_PATH
+        value: /app/data/grade.db
+      - key: UPLOAD_FOLDER
+        value: /app/uploads
