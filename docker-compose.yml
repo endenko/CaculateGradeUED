@@ -1,0 +1,18 @@
+# 🌸 UED Calculate Grade — docker-compose
+# Usage:
+#   docker compose up -d --build
+#   open http://localhost:5000
+services:
+  grade-ocr:
+    build: .
+    image: ued-grade-ocr:latest
+    container_name: ued-grade-ocr
+    ports:
+      - "5000:5000"
+    environment:
+      - OCR_HANDWRITING_ENGINE=paddle   # paddle | tesseract | google
+      # - GOOGLE_APPLICATION_CREDENTIALS=/app/key.json   # only if OCR_HANDWRITING_ENGINE=google
+    volumes:
+      - ./uploads:/app/uploads          # uploaded images persist on the host
+      - ./data:/app/data                # subjects CSV + grade.db persist on the host
+    restart: unless-stopped

@@ -1,0 +1,3 @@
+# OPTIONAL — only needed if you want the old Google Cloud Vision engine
+# (set OCR_HANDWRITING_ENGINE=google and GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json)
+google-cloud-vision>=3.5,<4

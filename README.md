@@ -10,8 +10,8 @@
 - [Tổng quan hệ thống](#-tổng-quan-hệ-thống)
 - [Tính năng chính](#-tính-năng-chính)
 - [Kiến trúc hệ thống](#-kiến-trúc-hệ-thống)
-- [Yêu cầu cài đặt](#-yêu-cầu-cài-đặt)
-- [Hướng dẫn cài đặt](#-hướng-dẫn-cài-đặt)
+- [🚀 Chạy bằng Docker (khuyến nghị)](#-chạy-bằng-docker-khuyến-nghị)
+- [Chạy local (không Docker)](#-chạy-local-không-docker)
 - [Cấu hình hệ thống](#-cấu-hình-hệ-thống)
 - [Cách sử dụng](#-cách-sử-dụng)
 - [API Reference](#-api-reference)
@@ -24,11 +24,13 @@
 
 **UED Calculate Grade** là ứng dụng web được xây dựng bằng **Flask (Python)**, có khả năng:
 
-1. **Quét ảnh bảng điểm** tự động bằng công nghệ OCR Hybrid (kết hợp Tesseract cục bộ + Google Cloud Vision API)
-2. **Tự động nhận diện và khớp tên môn học** từ cơ sở dữ liệu SQL Server
+1. **Quét ảnh bảng điểm** tự động bằng OCR Hybrid: **Tesseract** (ảnh máy tính) + **PaddleOCR Tiếng Việt** (ảnh viết tay)
+2. **Tự động nhận diện và khớp tên môn học** từ cơ sở dữ liệu (SQLite — Docker sẵn sàng)
 3. **Tính GPA** theo thang hệ 4 và hệ 10
 4. **Mô phỏng điểm số** (What-If Simulation) để sinh viên lên kế hoạch học tập
 5. **Gợi ý môn học lại** có tác động cao nhất đến GPA
+
+> ✨ **Thay đổi so với bản gốc:** OCR chữ viết tay đã chuyển từ **Google Cloud Vision API** (cần key + internet) sang **PaddleOCR với mô hình Tiếng Việt (`lang='vi'`)** — chạy hoàn toàn offline trong Docker, không cần API key, nhận diện tốt chữ viết tay tiếng Việt (dấu thanh, dấu mũ, ư/ơ...). Tesseract được **giữ nguyên** cho ảnh bảng điểm máy tính. Google Vision vẫn còn lại như engine **tùy chọn** (xem phần Cấu hình).
 
 ---
 
@@ -37,7 +39,7 @@
 | Tính năng | Mô tả |
 |-----------|-------|
 | 📸 **OCR Ảnh Máy Tính** | Dùng Tesseract (Local) để quét ảnh bảng điểm chụp từ cổng thông tin portal |
-| ✍️ **OCR Chữ Viết Tay** | Dùng Google Cloud Vision API để quét ảnh bảng điểm viết tay |
+| ✍️ **OCR Chữ Viết Tay** | Dùng **PaddleOCR Tiếng Việt** (offline, không cần API key) |
 | 🔍 **Fuzzy Matching** | Tự động sửa và khớp tên môn học với độ tương đồng OCR |
 | 📊 **Tính GPA thời gian thực** | Hiển thị GPA Hiện Tại, GPA Giả Lập và Chênh lệch |
 | 🎮 **Mô phỏng "What If"** | Thay đổi điểm số để xem GPA thay đổi như thế nào |
@@ -55,24 +57,26 @@
 │                  FRONTEND (Browser)                  │
 │  HTML (index.html) + CSS (style.css) + JS (script.js)│
 │  - localStorage để lưu bảng điểm phía client         │
-│  - Gọi API Flask qua fetch()                          │
+│  - Gọi API Flask qua fetch()                         │
 └────────────────────┬────────────────────────────────┘
                      │ HTTP Request
 ┌────────────────────▼────────────────────────────────┐
-│               BACKEND (Flask - LocalOCR.py)          │
+│               BACKEND (Flask - app.py)               │
 │  - Route /        → Serve trang HTML chính           │
 │  - Route /api/search_subject → Tìm kiếm môn học      │
 │  - Route /api/process_ocr    → Xử lý ảnh OCR         │
+│  - Route /health             → Healthcheck Docker    │
 └──────┬──────────────────────────────────┬────────────┘
        │                                  │
 ┌──────▼──────┐                  ┌────────▼──────────┐
-│  SQL Server │                  │   OCR Engine      │
-│  OCR_Grade  │                  │                   │
-│  - danh_muc_│                  │ Mode 1: Tesseract  │
-│    mon      │                  │  (Ảnh máy tính)   │
-│  - ten_mon  │                  │                   │
-│  - tin_chi  │                  │ Mode 2: Google    │
-└─────────────┘                  │  Cloud Vision API │
+│  SQLite DB  │                  │   OCR Engine      │
+│  grade.db   │                  │  (ocr/engines.py) │
+│  danh_muc_  │                  │                   │
+│    mon      │                  │ Mode 1: Tesseract  │
+│  ten_mon    │                  │  (Ảnh máy tính)   │
+│  tin_chi    │                  │                   │
+└─────────────┘                  │ Mode 2: PaddleOCR │
+                                 │  lang='vi'        │
                                  │  (Chữ viết tay)   │
                                  └───────────────────┘
 ```
@@ -95,11 +99,12 @@
     │                         │
     │                    Trích xuất từ + tọa độ (x,y)
     │
-    └── Handwriting Mode ──→ Google Cloud Vision API
+    └── Handwriting Mode ──→ PaddleOCR (lang='vi')
                                   │
-                             document_text_detection
+                             Vietnamese text rec
+                             (offline, no API key)
                                   │
-                             Trích xuất từ + bbox
+                             Trích xuất text + bbox
     │
     ▼
 Reconstruct Lines (Gom dòng theo tọa độ Y)
@@ -119,125 +124,103 @@ Trả về JSON → Frontend render vào bảng
 
 ---
 
-## 📦 Yêu cầu cài đặt
+## 🚀 Chạy bằng Docker (khuyến nghị)
 
-### Phần mềm bắt buộc
+Ứng dụng đã được Docker hóa hoàn toàn — **không cần cài Python, Tesseract, SQL Server hay bất kỳ API key nào**.
 
-| Phần mềm | Phiên bản | Link |
-|----------|-----------|------|
-| Python | ≥ 3.9 | [python.org](https://python.org) |
-| Tesseract OCR | ≥ 5.x | [github.com/UB-Mannheim/tesseract](https://github.com/UB-Mannheim/tesseract/wiki) |
-| SQL Server | 2017+ | [microsoft.com](https://www.microsoft.com/sql-server) |
-| ODBC Driver 17 | | [microsoft.com](https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server) |
+### Yêu cầu
 
-### Thư viện Python
+- Docker Engine + Docker Compose (bản mới nhất)
+
+### Các bước
 
 ```bash
-pip install flask
-pip install werkzeug
-pip install pyodbc
-pip install opencv-python
-pip install pytesseract
-pip install numpy
-pip install google-cloud-vision
+# 1. Vào thư mục dự án
+cd D:\OCRWEBSITE
+
+# 2. Build image + chạy container
+docker compose up -d --build
+
+# 3. Mở trình duyệt
+#    http://localhost:5000
 ```
 
-> **Lưu ý:** File `LocalOCR.py` là file chính cần chạy. File `app2.py` là phiên bản cũ chỉ dùng Google Vision (không có Tesseract local).
+Container sẽ tự động:
+- Cài Tesseract + gói ngôn ngữ `vie`
+- Cài PaddleOCR + **tải sẵn mô hình Tiếng Việt** (image chạy offline)
+- Tạo database SQLite `grade.db` từ `data/danh_muc_mon.csv`
+
+### Lệnh quản lý
+
+```bash
+docker compose logs -f        # Xem log
+docker compose restart        # Khởi động lại
+docker compose down           # Dừng (giữ volume uploads + grade.db)
+docker compose down -v        # Dừng và xóa hoàn toàn
+```
+
+> **Lưu ý:** Image đầu tiên khá lớn (~2GB) vì chứa PaddleOCR + mô hình Tiếng Việt. Lần build đầu sẽ lâu do tải mô hình.
 
 ---
 
-## 🚀 Hướng dẫn cài đặt
+## 🖥️ Chạy local (không Docker)
 
-### Bước 1: Cài Tesseract OCR
+### Yêu cầu
 
-1. Tải Tesseract về từ: https://github.com/UB-Mannheim/tesseract/wiki
-2. Cài đặt và ghi nhớ đường dẫn cài đặt (mặc định: `C:\Program Files\Tesseract-OCR\tesseract.exe`)
-3. **Quan trọng:** Phải cài thêm gói ngôn ngữ `Tiếng Việt (vie)` khi cài đặt
+| Phần mềm | Phiên bản | Ghi chú |
+|----------|-----------|---------|
+| Python | ≥ 3.9 | (khuyến nghị 3.11) |
+| Tesseract OCR | ≥ 5.x | [UB-Mannheim](https://github.com/UB-Mannheim/tesseract/wiki) — **phải cài gói `vie`** |
 
-### Bước 2: Cài đặt Python Libraries
+### Các bước
 
 ```bash
-# Tạo môi trường ảo (khuyến nghị)
+# 1. Tạo môi trường ảo
 python -m venv .venv
-.venv\Scripts\activate
+.venv\Scripts\activate        # Windows
+source .venv/bin/activate     # Linux/macOS
 
-# Cài đặt thư viện
-pip install flask werkzeug pyodbc opencv-python pytesseract numpy google-cloud-vision
+# 2. Cài thư viện
+pip install -r requirements.txt
+
+# 3. Tạo database SQLite từ danh sách môn học
+python seed_db.py
+
+# 4. Chạy server
+python app.py
 ```
 
-### Bước 3: Cấu hình SQL Server
+Mở trình duyệt: **http://127.0.0.1:5000**
 
-1. Mở **SQL Server Management Studio (SSMS)**
-2. Tạo database mới tên `OCR_Grade`
-3. Tạo bảng `danh_muc_mon` với cấu trúc sau:
-
-```sql
-CREATE TABLE danh_muc_mon (
-    id        INT IDENTITY(1,1) PRIMARY KEY,
-    ten_mon   NVARCHAR(200) NOT NULL,
-    tin_chi   INT NOT NULL
-);
-```
-
-4. Nhập danh sách môn học của trường vào bảng này
-
-### Bước 4: Cấu hình Google Cloud Vision API
-
-1. Truy cập [Google Cloud Console](https://console.cloud.google.com/)
-2. Tạo project mới → Bật API **Cloud Vision API**
-3. Tạo **Service Account** → Tải file JSON credentials về
-4. Đổi tên file thành `key.json` và đặt vào thư mục dự án:
-   ```
-   D:\Python_Code\AI_Project\App_Python\key.json
-   ```
-
-### Bước 5: Khởi động ứng dụng
-
-```bash
-# Kích hoạt môi trường ảo (nếu chưa)
-.venv\Scripts\activate
-
-# Chạy server Flask
-python LocalOCR.py
-```
-
-Mở trình duyệt và truy cập: **http://127.0.0.1:5000**
+> 💡 Windows: nếu Tesseract chưa có trong PATH, set biến môi trường:
+> ```bash
+> set TESSERACT_CMD=C:\Program Files\Tesseract-OCR\tesseract.exe
+> ```
 
 ---
 
 ## ⚙️ Cấu hình hệ thống
 
-Mở file `LocalOCR.py` và chỉnh sửa các dòng sau:
+Tất cả cấu hình qua **biến môi trường** (không còn đường dẫn Windows cứng trong code). Xem `.env.example`.
 
-### 1. Đường dẫn Tesseract
+| Biến | Mặc định | Mô tả |
+|------|----------|-------|
+| `OCR_HANDWRITING_ENGINE` | `paddle` | Engine OCR viết tay: `paddle` \| `tesseract` \| `google` |
+| `TESSERACT_CMD` | *(PATH)* | Đường dẫn tesseract.exe (Windows local) |
+| `DB_PATH` | `grade.db` | Đường dẫn database SQLite |
+| `UPLOAD_FOLDER` | `uploads` | Thư mục lưu ảnh upload |
+| `PORT` | `5000` | Cổng Flask (chỉ `python app.py`) |
+| `GOOGLE_APPLICATION_CREDENTIALS` | *(trống)* | Chỉ khi dùng engine `google` |
 
-```python
-# Dòng 22 - Thay bằng đường dẫn thực tế trên máy bạn
-pytesseract.pytesseract.tesseract_cmd = r'D:\OCR\tesseract.exe'
+### Engine Google Vision (tùy chọn — để so sánh luận văn)
 
-# Ví dụ các đường dẫn phổ biến:
-# r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-# r'C:\Users\<TenBan>\AppData\Local\Programs\Tesseract-OCR\tesseract.exe'
-```
+Google Vision **không còn là engine mặc định**. Nếu muốn dùng lại để so sánh:
 
-### 2. Đường dẫn Google API Key
-
-```python
-# Dòng 25 - Thay bằng đường dẫn file key.json của bạn
-os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = r"D:\Python_Code\AI_Project\App_Python\key.json"
-```
-
-### 3. Thông tin kết nối SQL Server
-
-```python
-# Dòng 28 - Thay thông tin database của bạn
-DB_CONFIG = {
-    'DRIVER': '{ODBC Driver 17 for SQL Server}',
-    'SERVER': 'localhost',         # Tên hoặc IP SQL Server
-    'DATABASE': 'OCR_Grade',       # Tên database
-    'UID': 'sa',                   # Username
-    'PWD': '1'                     # Password (⚠️ Thay bằng mật khẩu thực!)
-}
+```bash
+pip install -r requirements-google.txt
+set OCR_HANDWRITING_ENGINE=google
+set GOOGLE_APPLICATION_CREDENTIALS=D:\path\to\key.json
+python app.py
 ```
 
 ---
@@ -245,8 +228,6 @@ DB_CONFIG = {
 ## 📖 Cách sử dụng
 
 ### 1. Nhập môn học thủ công
-
-![Nhập thủ công](docs/manual_input.png)
 
 1. Gõ **tên môn học** vào ô "Tên môn học" → Hệ thống tự gợi ý từ database
 2. Chọn **số tín chỉ** (1-4)
@@ -260,12 +241,11 @@ DB_CONFIG = {
 **Chế độ A - Ảnh Portal (Máy tính):**
 - Dùng cho ảnh chụp màn hình/chụp lại từ website cổng thông tin sinh viên
 - Sử dụng Tesseract OCR (không cần Internet)
-- Độ chính xác cao với chữ in ấn rõ ràng
 
 **Chế độ B - Ảnh Viết Tay:**
 - Dùng cho ảnh chụp bảng điểm viết tay (phiếu điểm, sổ điểm)
-- Sử dụng Google Cloud Vision API (cần Internet + API Key)
-- Xử lý tốt chữ viết tay phức tạp
+- Sử dụng **PaddleOCR Tiếng Việt** (offline, không cần Internet/API key)
+- Nhận diện tốt chữ viết tay tiếng Việt (dấu thanh, dấu mũ, ư/ơ/ă/â...)
 
 **Các bước thực hiện:**
 1. Chọn chế độ OCR phù hợp (`Ảnh Portal` hoặc `Ảnh Viết Tay`)
@@ -361,6 +341,7 @@ Xử lý ảnh bảng điểm bằng OCR và trả về danh sách môn học.
 ```json
 {
     "success": true,
+    "engine": "paddle",
     "data": [
         {
             "raw_name": "Co so du lieu",
@@ -373,6 +354,8 @@ Xử lý ảnh bảng điểm bằng OCR và trả về danh sách môn học.
 }
 ```
 
+> `engine` cho biết engine OCR đã dùng: `tesseract` | `paddle` | `google`
+
 **Response lỗi:**
 ```json
 {
@@ -381,29 +364,76 @@ Xử lý ảnh bảng điểm bằng OCR và trả về danh sách môn học.
 }
 ```
 
+### GET `/health`
+
+Healthcheck cho Docker.
+
+**Response:** `{ "success": true, "status": "ok" }`
+
+---
+
+## ✅ Kết quả kiểm thử OCR (ảnh mẫu trong `uploads/`)
+
+### Chế độ Viết Tay — Vietnamese PaddleOCR (`lang='vi'`)
+
+| Ảnh mẫu | Kết quả OCR | Tên khớp DB | % | TC | Điểm |
+|---------|-------------|-------------|----|----|----|
+| `2.jpg` (ảnh chụp sổ tay) | `coro'de?lieu` | Cơ sở dữ liệu | 61% | 4 | A |
+| `2.jpg` | `Loain +rimh C++` | Lập trình C++ | 100% | 3 | B |
+| `2.jpg` | `Toan RoiRac` | Toán rời rạc | 95% | 4 | B+ |
+| `Screenshot_2026-03-28_174553.png` | `ln tainh Java` | Lập trình Java | 81% | 3 | B |
+| `Screenshot_2026-03-28_174553.png` | `Yai xuat thong'le` | Xác suất thống kê | 72% | 3 | C+ |
+| `Screenshot_2026-03-28_174553.png` | `cap trinh web` | Lập trình Web | 92% | 3 | C |
+| `Screenshot_2026-03-28_172609.png` | `Toán ri rc` | Toán rời rạc | 90% | 4 | B |
+| `Screenshot_2026-03-28_172609.png` | `Lp trình JAVA` | Lập trình Java | 96% | 3 | C |
+| `Screenshot_2026-03-28_172609.png` | `Xác xut thng kê` | Xác suất thống kê | 87% | 3 | C+ |
+
+**9/9 dòng viết tay nhận diện đúng** — đọc được cả tên môn (qua fuzzy matching), tín chỉ và điểm hệ 4.
+
+### Chế độ Máy Tính — Tesseract (giữ nguyên bản gốc)
+
+| Ảnh mẫu | Số dòng | Kết quả |
+|---------|---------|---------|
+| `test.png` | 6 | 6/6 đúng (Lịch sử Đảng, KHGD, PPDH Tin học, PT&TK HTTT, Web, CSDL) |
+| `Screenshot_2026-01-31_151043.png` | 6 | 6/6 đúng (XSTK, Giải tích thực & ĐSTT, Scratch, C/C++, TRR, GD học) |
+| `ky1nam1.png` | 6 | 6/6 đúng |
+
+**Tesseract không bị thay đổi** — cùng preprocessing (OpenCV), cùng `lang='vie+eng'`, cùng parser.
+
 ---
 
 ## 📁 Cấu trúc thư mục
 
 ```
-App_Python/
+OCRWEBSITE/
 │
-├── LocalOCR.py          ⭐ File chính - Server Flask (Hybrid OCR)
-├── app2.py              📦 Phiên bản cũ - Chỉ dùng Google Vision
-├── app.py               📦 Phiên bản thử nghiệm cũ
-├── key.json             🔑 Google Cloud API Key (KHÔNG share lên git!)
-├── water_stock.db       🗃️ File SQLite dự phòng (không dùng chính)
+├── app.py                  ⭐ File chính - Server Flask (Hybrid OCR)
+├── LocalOCR.py             📦 Bản gốc (tham khảo) - SQL Server + Google Vision
+├── db.py                   🗄️ Lớp database SQLite (thay SQL Server)
+├── seed_db.py              🌱 Tạo grade.db từ danh sách môn học
+├── grade.db                🗃️ SQLite database (tự tạo khi seed)
+│
+├── ocr/
+│   └── engines.py          👁️ 3 OCR engines: Tesseract + PaddleOCR(vi) + Google (tùy chọn)
+│
+├── data/
+│   └── danh_muc_mon.csv    📋 Danh sách môn học + tín chỉ (seed)
 │
 ├── templates/
-│   ├── index.html       🌐 Giao diện chính (Bootstrap 5 + FontAwesome)
-│   └── index_ban_cu.html  📄 Phiên bản giao diện cũ
+│   ├── index.html          🌐 Giao diện chính (Bootstrap 5 + FontAwesome)
+│   └── index_ban_cu.html   📄 Phiên bản giao diện cũ
 │
 ├── static/
-│   ├── style.css        🎨 CSS tùy chỉnh
-│   └── script.js        ⚡ Logic frontend (GPA, OCR, Simulation)
+│   ├── style.css           🎨 CSS tùy chỉnh
+│   └── script.js           ⚡ Logic frontend (GPA, OCR, Simulation)
 │
-├── uploads/             📂 Thư mục lưu ảnh tạm sau khi upload OCR
-└── .venv/               🐍 Môi trường Python ảo
+├── uploads/                📂 Thư mục lưu ảnh tạm sau khi upload OCR
+│
+├── Dockerfile              🐳 Build image (Tesseract + PaddleOCR + mô hình vi)
+├── docker-compose.yml      🐳 Chạy 1 lệnh: docker compose up -d --build
+├── requirements.txt        📦 Python dependencies (chính)
+├── requirements-google.txt 📦 (Tùy chọn) Chỉ khi dùng engine Google Vision
+└── .env.example            ⚙️ Mẫu biến môi trường
 ```
 
 ---
@@ -426,49 +456,30 @@ App_Python/
 
 ## 🐛 Xử lý lỗi thường gặp
 
-### ❌ `LỖI KẾT NỐI DB`
-```
-❌ LỖI KẾT NỐI DB: [28000] [Microsoft][ODBC Driver 17 for SQL Server]
-```
-**Nguyên nhân:** SQL Server không chạy hoặc sai thông tin đăng nhập  
+### ❌ `TesseractNotFoundError` (chạy local Windows)
+**Nguyên nhân:** Tesseract chưa cài hoặc chưa có trong PATH
 **Giải pháp:**
-- Kiểm tra SQL Server đang chạy trong Services
-- Kiểm tra lại `UID`, `PWD` trong `DB_CONFIG`
-- Bật SQL Server Authentication trong SSMS
+- Cài từ [UB-Mannheim](https://github.com/UB-Mannheim/tesseract/wiki) (tích `vie`)
+- Hoặc set biến môi trường: `set TESSERACT_CMD=C:\Program Files\Tesseract-OCR\tesseract.exe`
 
----
+### ❌ `LỖI KẾT NỐI DB` (bản gốc SQL Server)
+**Nguyên nhân:** SQL Server không chạy hoặc sai thông tin đăng nhập
+**Giải pháp:** Bản Docker hóa đã chuyển sang **SQLite** — không cần SQL Server. Xóa `grade.db` và chạy lại `python seed_db.py` nếu DB lỗi.
 
-### ❌ `TesseractNotFoundError`
-```
-pytesseract.pytesseract.TesseractNotFoundError: ...
-```
-**Nguyên nhân:** Đường dẫn Tesseract sai  
-**Giải pháp:** Cập nhật dòng 22 trong `LocalOCR.py` với đường dẫn đúng:
-```python
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-```
-
----
-
-### ❌ `google.auth.exceptions.DefaultCredentialsError`
-```
-Could not automatically determine credentials...
-```
-**Nguyên nhân:** File `key.json` không tồn tại hoặc đường dẫn sai  
+### ❌ PaddleOCR báo lỗi tải mô hình
+**Nguyên nhân:** Chưa có internet lần đầu chạy (local) hoặc model cache lỗi
 **Giải pháp:**
-- Kiểm tra file `key.json` đã được tải về và đặt đúng vị trí
-- Kiểm tra đường dẫn trong dòng 25 của `LocalOCR.py`
-- Đảm bảo Cloud Vision API đã được bật trong Google Cloud Console
-
----
+- Local: chạy `python -c "from ocr.engines import warmup; warmup()"` khi có internet
+- Docker: mô hình đã được tải sẵn lúc build image
 
 ### ❌ OCR đọc sai tên môn
-**Nguyên nhân:** Ảnh mờ, ánh sáng kém, hoặc font chữ lạ  
+**Nguyên nhân:** Ảnh mờ, ánh sáng kém, hoặc font chữ lạ
 **Giải pháp:**
 - Sử dụng ảnh có độ phân giải cao (tối thiểu 1080p)
 - Đảm bảo ảnh thẳng, không bị nghiêng
 - Chụp trong điều kiện ánh sáng tốt
 - Sau khi quét, kiểm tra và chỉnh sửa thủ công nếu cần
+- Thêm tên môn chính xác vào `data/danh_muc_mon.csv` → `python seed_db.py` để tăng độ khớp
 
 ---
 
@@ -485,16 +496,22 @@ Could not automatically determine credentials...
 
 | Layer | Công nghệ |
 |-------|-----------|
-| **Backend** | Python 3.x + Flask |
-| **OCR Engine 1** | Tesseract OCR (Local) + OpenCV |
-| **OCR Engine 2** | Google Cloud Vision API |
-| **Database** | Microsoft SQL Server 2017+ |
-| **DB Connector** | pyodbc (ODBC Driver 17) |
+| **Backend** | Python 3.11 + Flask |
+| **OCR Engine 1** | Tesseract OCR (Local) + OpenCV — ảnh máy tính |
+| **OCR Engine 2** | **PaddleOCR `lang='vi'` — chữ viết tay tiếng Việt (offline)** |
+| **OCR Engine 3** | Google Cloud Vision (tùy chọn, để so sánh) |
+| **Database** | **SQLite** (thay SQL Server — zero-config) |
 | **Fuzzy Matching** | Python `difflib.SequenceMatcher` |
+| **Deployment** | **Docker + Docker Compose** (gunicorn, healthcheck) |
 | **Frontend** | HTML5 + Bootstrap 5 + Font Awesome 6 |
 | **Frontend Logic** | Vanilla JavaScript + LocalStorage |
 | **Styling** | CSS3 với CSS Variables |
 
 ---
 
-*Được xây dựng với ❤️ cho sinh viên Đại học Đà Nẵng*
+## 💾 Lưu ý về dữ liệu
+
+- **Bảng điểm** được lưu trong **localStorage** của trình duyệt (tự động)
+- Dữ liệu **KHÔNG mất** khi đóng trình duyệt
+- Dữ liệu **SẼ MẤT** nếu xóa cache/cookie trình duyệt
+- Ảnh upload được lưu tạm trong thư mục `uploads/` (an toàn để xóa thủ công)

@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Runtime data
+grade.db
+uploads/*
+!uploads/*.png
+!uploads/*.jpg
+!uploads/*.jpeg
+
+# Env
+.env
+
+# OS
+Thumbs.db
+.DS_Store

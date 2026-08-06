@@ -1,0 +1,10 @@
+# UED Calculate Grade — Python dependencies
+# OCR engines: Tesseract (kept) + PaddleOCR Vietnamese (replaces Google Cloud Vision)
+flask>=3.0,<4
+werkzeug>=3.0,<4
+opencv-python-headless>=4.8,<5
+pytesseract>=0.3.10
+numpy>=1.26,<3
+paddlepaddle>=3.0,<4
+paddleocr>=3.0,<4
+gunicorn>=22,<24
