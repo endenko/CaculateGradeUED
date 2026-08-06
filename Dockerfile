@@ -9,7 +9,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     DB_PATH=/app/data/grade.db \
     OCR_HANDWRITING_ENGINE=paddle \
     OCR_MODEL_SIZE=hybrid \
-    UPLOAD_FOLDER=/app/uploads
+    UPLOAD_FOLDER=/app/uploads \
+    OMP_NUM_THREADS=2 \
+    MKL_NUM_THREADS=2
 
 # --- System deps: Tesseract + vie language pack, OpenCV/Paddle shared libs ---
 RUN apt-get update && apt-get install -y --no-install-recommends \

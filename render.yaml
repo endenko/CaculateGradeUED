@@ -23,3 +23,7 @@ services:
         value: /app/data/grade.db
       - key: UPLOAD_FOLDER
         value: /app/uploads
+      - key: OMP_NUM_THREADS
+        value: "2"          # cap OpenMP threads -> lower memory on the free plan
+      - key: MKL_NUM_THREADS
+        value: "2"
