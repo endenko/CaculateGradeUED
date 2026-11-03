@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends libgl1 libglib2
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu \
- && pip install --no-cache-dir -r requirements.txt \
+ && pip install --no-cache-dir -r requirements-full.txt \
  && pip install --no-cache-dir --no-deps vietocr==0.3.13
 COPY . .
 RUN mkdir -p /app/models && curl -L -o /app/models/vgg_transformer.pth https://vocr.vn/data/vietocr/vgg_transformer.pth \

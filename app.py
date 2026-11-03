@@ -26,7 +26,7 @@ from utils import no_accent_vietnamese, normalize
 app = Flask(__name__)
 
 # --- CẤU HÌNH (từ biến môi trường, không còn đường dẫn Windows cứng) ---
-UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', 'uploads')
+UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', '/tmp/uploads' if os.environ.get('VERCEL') else 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024  # 32MB
@@ -436,7 +436,7 @@ def process_ocr():
                 word_list = engines.computer_words(path)
                 lines = reconstruct_lines(word_list, mode)
                 extracted_data = parse_computer(lines)
-                engine = 'tesseract' if engines._tesseract_is_available() else 'paddle-det+vietocr'
+                engine = 'rapidocr-onnx' if engines.OCR_HANDWRITING_ENGINE == 'rapid' else ('tesseract' if engines._tesseract_is_available() else 'paddle-det+vietocr')
 
             return jsonify({"success": True, "data": extracted_data, "engine": engine})
         except Exception as e:
@@ -477,7 +477,7 @@ if not db.all_subjects():
 
 if os.environ.get('WARMUP', '0') == '1':
     import threading
-    threading.Thread(target=lambda: engines._vietocr_is_available() and engines._get_hybrid(), daemon=True).start()
+    threading.Thread(target=lambda: engines._get_rapid() if engines.OCR_HANDWRITING_ENGINE == 'rapid' else (engines._vietocr_is_available() and engines._get_hybrid()), daemon=True).start()
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

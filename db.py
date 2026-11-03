@@ -17,7 +17,7 @@ import sqlite3
 from collections import Counter, defaultdict
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE, 'grade.db'))
+DB_PATH = os.environ.get('DB_PATH', '/tmp/grade.db' if os.environ.get('VERCEL') else os.path.join(BASE, 'grade.db'))
 SEED_CSV = os.path.join(BASE, 'data', 'danh_muc_mon.csv')
 UED_CSV = os.path.join(BASE, 'data', 'hoc_phan_ued.csv')
 

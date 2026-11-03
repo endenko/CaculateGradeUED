@@ -612,3 +612,12 @@ Cloud Run trả về URL công khai `https://ued-grade-xxxx.a.run.app`. Đặt `
 
 ### Hugging Face Spaces (Docker)
 Tạo Space SDK *Docker*, push repo này (YAML đầu README đã khai báo `sdk: docker`, `app_port: 7860`). Lưu ý: từ 2026 Docker Space trên CPU Basic yêu cầu gói PRO.
+
+
+## ⚡ Bản nhẹ (mặc định khi deploy miễn phí, không cần thẻ)
+`requirements.txt` = Flask + **RapidOCR** (mô hình PaddleOCR PP-OCRv5 det + latin rec, chạy bằng onnxruntime, ~13 MB trong `models/`). Không cần torch/paddle.
+Đo trên máy: RAM đỉnh **~385 MB**, 0.5–2.5 s/ảnh; ảnh viết tay giả lập 9/10, ảnh Portal 6/6. Tên môn mất dấu sẽ được fuzzy matching sửa theo CSDL.
+Bật bằng `OCR_LIGHT=1` (tự bật khi chạy trên Vercel). Bản đầy đủ (VietOCR): `requirements-full.txt` + `Dockerfile`.
+
+* **Vercel (Hobby, không cần thẻ, đăng nhập GitHub)**: Import repo → framework Flask tự nhận (`vercel.json`). Python function ≤500 MB, 2 GB RAM, 1 vCPU.
+* **Render free (không cần thẻ, đăng nhập GitHub/Google)**: New → Blueprint → chọn repo (`render.yaml`, plan free 512 MB / 0.1 CPU, ngủ sau 15 phút).

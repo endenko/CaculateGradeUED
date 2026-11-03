@@ -21,21 +21,27 @@ import re
 import tempfile
 import threading
 
-import cv2
 import numpy as np
+try:
+    import cv2
+except Exception:  # pragma: no cover
+    cv2 = None
 
 # ---------------------------------------------------------------------------
 # Config from environment (no hardcoded Windows paths anymore)
 # ---------------------------------------------------------------------------
 TESSERACT_CMD = os.environ.get("TESSERACT_CMD", "").strip()
 
-if TESSERACT_CMD:
+try:
     import pytesseract
-    pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD
-else:
-    import pytesseract  # let pytesseract find tesseract on PATH (Docker: /usr/bin/tesseract)
+    if TESSERACT_CMD:
+        pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD
+except ImportError:  # light deployments
+    pytesseract = None
 
-OCR_HANDWRITING_ENGINE = os.environ.get("OCR_HANDWRITING_ENGINE", "vietocr").strip().lower()
+# On serverless hosts (Vercel / Render free) default to the light ONNX engine
+_LIGHT_DEFAULT = 'rapid' if (os.environ.get('VERCEL') or os.environ.get('OCR_LIGHT') == '1') else 'vietocr'
+OCR_HANDWRITING_ENGINE = os.environ.get("OCR_HANDWRITING_ENGINE", _LIGHT_DEFAULT).strip().lower()
 OCR_COMPUTER_ENGINE = os.environ.get("OCR_COMPUTER_ENGINE", "auto").strip().lower()
 
 # ---------------------------------------------------------------------------
@@ -79,7 +85,7 @@ def tesseract_full_text(image_path):
     Falls back to the VietOCR hybrid (line-joined) when Tesseract is not installed."""
     import shutil
     if not (TESSERACT_CMD or shutil.which('tesseract')):
-        words = hybrid_words(image_path)
+        words = rapid_words(image_path) if OCR_HANDWRITING_ENGINE == 'rapid' else hybrid_words(image_path)
         words.sort(key=lambda w: (round(w['y'] / 20), w['x']))
         return "\n".join(w['text'] for w in words)
     processed_img = preprocess_image(image_path)
@@ -377,7 +383,78 @@ def engine_status():
         'paddleocr': _paddle_is_available(),
         'tesseract': _tesseract_is_available(),
         'google_vision': _google_is_available(),
+        'rapidocr': _rapid_is_available(),
     }
+
+
+# ===========================================================================
+# 2c) LIGHT: RapidOCR (PaddleOCR models exported to ONNX, onnxruntime) — no torch,
+#     no paddle. ~25 MB of models, fits 512 MB-2 GB free hosts / Vercel Python.
+#     Diacritics are weaker; the DB fuzzy matcher restores the subject names.
+# ===========================================================================
+_rapid = None
+_rapid_lock = threading.Lock()
+MODELS_DIR = os.environ.get('MODELS_DIR', os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'models'))
+RAPID_PROFILE = os.environ.get('RAPID_PROFILE', 'latin')  # 'latin' (PP-OCRv5 latin rec) | 'v6' (PP-OCRv6 small)
+
+
+def _rapid_is_available():
+    try:
+        import rapidocr  # noqa: F401
+        return True
+    except Exception:
+        return False
+
+
+def _get_rapid():
+    global _rapid
+    if _rapid is None:
+        from rapidocr import RapidOCR, LangRec, OCRVersion, ModelType
+        if RAPID_PROFILE == 'v6':
+            det, rec = 'PP-OCRv6_det_small.onnx', 'PP-OCRv6_rec_small.onnx'
+            params = {}
+        else:
+            det, rec = 'ch_PP-OCRv5_det_mobile.onnx', 'latin_PP-OCRv5_rec_mobile.onnx'
+            params = {"Rec.lang_type": LangRec.LATIN, "Rec.ocr_version": OCRVersion.PPOCRV5,
+                      "Rec.model_type": ModelType.MOBILE, "Det.ocr_version": OCRVersion.PPOCRV5,
+                      "Det.model_type": ModelType.MOBILE}
+        params["Global.use_cls"] = False
+        # bound detector input -> bounded RAM (fits 512 MB hosts)
+        params["Det.limit_type"] = os.environ.get('RAPID_LIMIT_TYPE', 'max')
+        params["Det.limit_side_len"] = int(os.environ.get('RAPID_LIMIT_SIDE', '1600'))
+        params["EngineConfig.onnxruntime.intra_op_num_threads"] = int(os.environ.get('OMP_NUM_THREADS', '2'))
+        cls = os.path.join(MODELS_DIR, 'ch_ppocr_mobile_v2.0_cls_mobile.onnx')
+        if os.path.exists(cls):
+            params["Cls.model_path"] = cls
+        if os.path.exists(os.path.join(MODELS_DIR, det)):
+            params["Det.model_path"] = os.path.join(MODELS_DIR, det)
+        if os.path.exists(os.path.join(MODELS_DIR, rec)):
+            params["Rec.model_path"] = os.path.join(MODELS_DIR, rec)
+        _rapid = RapidOCR(params=params)
+    return _rapid
+
+
+def rapid_words(image_path):
+    tmp_path = None
+    try:
+        path = _prepare_image(image_path)
+        if path != image_path:
+            tmp_path = path
+        with _rapid_lock:
+            r = _get_rapid()(path)
+        words = []
+        if r is not None and r.boxes is not None:
+            for box, txt in zip(r.boxes, r.txts):
+                pts = np.asarray(box, dtype=np.float64)
+                if txt and txt.strip():
+                    words.append({'text': txt.strip(), 'x': float(pts[:, 0].mean()), 'y': float(pts[:, 1].mean())})
+        return words
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
 
 
 # ===========================================================================
@@ -411,6 +488,8 @@ def google_words(image_path):
 def computer_words(image_path):
     """Computer-screenshot mode: Tesseract if installed (original behavior),
     otherwise the free PaddleOCR-det + VietOCR hybrid."""
+    if OCR_COMPUTER_ENGINE == 'rapid' or (OCR_COMPUTER_ENGINE == 'auto' and OCR_HANDWRITING_ENGINE == 'rapid'):
+        return rapid_words(image_path)
     if OCR_COMPUTER_ENGINE in ('auto', 'tesseract') and _tesseract_is_available():
         return tesseract_words(image_path)
     if _vietocr_is_available():
@@ -425,6 +504,8 @@ def handwriting_words(image_path):
     Vietnamese engine is not available/installed, so the app never crashes.
     """
     engine = OCR_HANDWRITING_ENGINE
+    if engine == 'rapid' and _rapid_is_available():
+        return rapid_words(image_path), 'rapidocr-onnx'
     if engine == 'google' and _google_is_available():
         try:
             return google_words(image_path), 'google'

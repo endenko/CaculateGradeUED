@@ -89,12 +89,28 @@ function addManualSubject() {
 let pendingOCR = [];
 function escapeHtml(t) { return String(t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-function uploadOCR() {
+function downscale(file, maxSide = 2000) {
+    return new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => {
+            const k = Math.min(1, maxSide / Math.max(img.width, img.height));
+            if (k === 1 && file.size < 3.5e6) return resolve(file);
+            const c = document.createElement('canvas');
+            c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+            c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+            c.toBlob(b => resolve(new File([b], 'scan.jpg', { type: 'image/jpeg' })), 'image/jpeg', 0.92);
+        };
+        img.onerror = () => resolve(file);
+        img.src = URL.createObjectURL(file);
+    });
+}
+
+async function uploadOCR() {
     const fileInput = document.getElementById('ocrFile');
     if (fileInput.files.length === 0) return alert("Vui lòng chọn ảnh trước bạn nhé!");
     const mode = document.querySelector('input[name="ocrMode"]:checked').value;
     const formData = new FormData();
-    formData.append('file_anh', fileInput.files[0]);
+    formData.append('file_anh', await downscale(fileInput.files[0]));
     formData.append('mode', mode);
     document.getElementById('ocrLoading').style.display = 'inline-block';
     fetch('/api/process_ocr', { method: 'POST', body: formData })
