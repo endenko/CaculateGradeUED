@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UED Calculate Grade — Trường ĐH Sư phạm, ĐH Đà Nẵng</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" sizes="32x32">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon-32.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -13,11 +16,11 @@
 <body>
 <header class="ued-hero">
     <div class="container d-flex flex-column flex-md-row align-items-center gap-3 py-4">
-        <div class="ued-logo" aria-hidden="true"><span>UED</span></div>
+        <img class="ued-logo" src="{{ url_for('static', filename='ued-logo.png') }}" alt="Biểu trưng Trường Đại học Sư phạm – Đại học Đà Nẵng">
         <div class="text-center text-md-start flex-grow-1">
             <div class="ued-kicker">ĐẠI HỌC ĐÀ NẴNG · TRƯỜNG ĐẠI HỌC SƯ PHẠM</div>
             <h1 class="ued-title">UED Calculate Grade</h1>
-            <p class="ued-sub mb-0">Quét bảng điểm (máy tính &amp; viết tay) · Tính GPA · Giả lập học lại · Điểm rèn luyện</p>
+            <p class="ued-sub mb-0">Bảng điểm, GPA học kỳ / năm / tích lũy, điểm thành phần, điểm rèn luyện, bảng tin tuần</p>
         </div>
         <div class="ued-stats text-center" id="dbStats">
             <div class="num" id="statSubjects">…</div><div class="lbl">môn học</div>
@@ -26,7 +29,18 @@
     </div>
 </header>
 
+<nav class="ued-nav no-print" aria-label="Chức năng">
+    <div class="container d-flex gap-2 py-2">
+        <button type="button" class="nav-pill active" data-panel="bangdiem">Bảng điểm</button>
+        <button type="button" class="nav-pill" data-panel="hocphan">Điểm học phần</button>
+        <button type="button" class="nav-pill" data-panel="gpa">GPA &amp; cảnh báo</button>
+        <button type="button" class="nav-pill" data-panel="drl">Điểm rèn luyện</button>
+        <button type="button" class="nav-pill" data-panel="tintuc">Bảng tin tuần</button>
+        <button type="button" class="nav-pill" data-panel="quydinh">Nguồn quy định</button>
+    </div>
+</nav>
 <main class="container py-4">
+<section id="panel-bangdiem" class="tool-panel">
     <div class="row g-3 mb-4">
         <div class="col-md-4"><div class="card score-box old">
             <div class="score-label"><i class="fas fa-graduation-cap"></i> GPA hiện tại</div>
@@ -77,6 +91,29 @@
                         <label class="form-label small">Hệ chữ</label>
                         <input type="text" id="inputGrade4" class="form-control text-center fw-bold" readonly placeholder="A">
                     </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label small">Năm học</label>
+                        <select id="inputYear" class="form-select">
+                            <option>2022-2023</option><option>2023-2024</option><option>2024-2025</option>
+                            <option>2025-2026</option><option selected>2026-2027</option><option>2027-2028</option>
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label small">Học kỳ</label>
+                        <select id="inputTerm" class="form-select">
+                            <option value="1">Học kỳ 1</option><option value="2">Học kỳ 2</option><option value="he">Học kỳ hè</option>
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label small">Lần học</label>
+                        <input type="number" id="inputAttempt" class="form-control text-center" value="1" min="1" max="6">
+                    </div>
+                    <div class="col-6 col-md-4 d-flex align-items-end">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="inputPassOnly">
+                            <label class="form-check-label small" for="inputPassOnly">Chỉ đạt/không đạt (P, không vào GPA)</label>
+                        </div>
+                    </div>
                     <div class="col-12 col-md-3">
                         <button class="btn btn-ued w-100" onclick="addManualSubject()"><i class="fas fa-plus"></i> Thêm</button>
                     </div>
@@ -98,7 +135,7 @@
                     <img id="ocrPreview" alt="" style="display:none;">
                     <div id="dropHint"><i class="fas fa-cloud-arrow-up fa-2x mb-2"></i><br>
                         Kéo thả ảnh vào đây hoặc <u>chọn ảnh</u><br>
-                        <small class="text-muted">OCR miễn phí, chạy offline: PaddleOCR (phát hiện chữ) + VietOCR (nhận dạng tiếng Việt)</small></div>
+                        <small class="text-muted">OCR nhẹ RapidOCR khi máy chủ bật OCR_LIGHT=1. Ảnh được thu nhỏ trên máy bạn trước khi gửi.</small></div>
                 </label>
                 <input type="file" id="ocrFile" class="d-none" accept="image/*">
                 <button class="btn btn-ued-dark w-100 mt-3" onclick="uploadOCR()"><i class="fas fa-wand-magic-sparkles"></i> Quét ngay</button>
@@ -108,16 +145,19 @@
             <div class="card p-4 mb-4">
                 <div class="d-flex flex-wrap gap-2 justify-content-between mb-3">
                     <h5 class="section-title mb-0"><i class="fas fa-list-ul"></i> Bảng điểm của bạn</h5>
-                    <div class="btn-group">
-                        <button class="btn btn-sm btn-outline-ued" onclick="resetSimulation()">🔄 Reset giả lập</button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="clearAllData()">🗑️ Xóa hết</button>
+                    <div class="btn-group flex-wrap">
+                        <button class="btn btn-sm btn-outline-ued" onclick="resetSimulation()">Reset giả lập</button>
+                        <button class="btn btn-sm btn-outline-ued" onclick="exportTranscript()">Xuất JSON</button>
+                        <button class="btn btn-sm btn-outline-ued" onclick="window.print()">In</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="clearAllData()">Xóa hết</button>
                     </div>
                 </div>
                 <div class="table-responsive" style="max-height:520px;overflow-y:auto;">
                     <table class="table table-hover align-middle ued-table">
                         <thead class="sticky-top"><tr>
                             <th>Môn học</th><th class="text-center">TC</th><th class="text-center">Điểm</th>
-                            <th class="text-center" style="width:140px;">Giả lập</th><th class="text-center">Xóa</th></tr></thead>
+                            <th class="text-center">Học kỳ</th>
+                            <th class="text-center" style="width:110px;">Giả lập</th><th class="text-center">Xóa</th></tr></thead>
                         <tbody id="transcriptTable"></tbody>
                     </table>
                 </div>
@@ -126,42 +166,141 @@
 
         <div class="col-lg-4">
             <div class="card p-3 mb-3">
-                <h5 class="section-title"><i class="fas fa-calculator"></i> Tính toán ra trường</h5>
-                <div class="mb-2"><label class="form-label small">Tổng tín chỉ quy định</label>
-                    <input type="number" id="targetCredits" class="form-control form-control-sm" value="130" onchange="calculateStats()"></div>
-                <div class="mb-2"><label class="form-label small">Số tín chỉ còn lại</label>
-                    <input type="text" id="remainingCredits" class="form-control form-control-sm bg-white" readonly value="130"></div>
-                <div class="mb-2"><label class="form-label small">Mục tiêu xếp loại</label>
-                    <select id="goalGPA" class="form-select form-select-sm">
-                        <option value="3.6">Xuất sắc (3.6+)</option><option value="3.2">Giỏi (3.2+)</option><option value="2.5">Khá (2.5+)</option>
-                    </select></div>
-                <button class="btn btn-ued w-100 btn-sm mb-2" onclick="calculateGraduationPath()">🚀 Tính toán</button>
-                <div id="gradResult" class="p-2 rounded text-center small" style="display:none;"></div>
+                <h5 class="section-title"><i class="fas fa-scale-balanced"></i> Quy tắc đang dùng</h5>
+                <select id="ruleSelect" class="form-select form-select-sm mb-2">
+                    <option value="qd1586" selected>Khóa 2021–2024 — QĐ 1586 (có A+/B+/C+/D+)</option>
+                    <option value="qd2025">Khóa 2025 trở đi — QĐ 1586 và QĐ 1498</option>
+                    <option value="qd1473">Khóa 2020 trở về trước — QĐ 1473 (A/B/C/D/F)</option>
+                </select>
+                <label class="form-label small">Tổng tín chỉ chương trình</label>
+                <input type="number" id="targetCredits" class="form-control form-control-sm mb-2" value="130" min="1">
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="disciplineFlag">
+                    <label class="form-check-label small" for="disciplineFlag">Đã bị kỷ luật từ mức cảnh cáo trở lên</label>
+                </div>
+                <div id="sideSummary" class="small"></div>
             </div>
-
             <div class="card p-3 mb-3">
-                <h5 class="section-title"><i class="fas fa-user-graduate"></i> Điểm rèn luyện</h5>
-                <div class="mb-2"><label class="form-label small">Mục tiêu cả năm</label>
-                    <select id="drlTarget" class="form-select form-select-sm">
-                        <option value="90">Xuất sắc (90+)</option><option value="80">Tốt (80+)</option>
-                        <option value="70">Khá (70+)</option><option value="65">TB Khá (65+)</option>
-                    </select></div>
-                <div class="mb-2"><label class="form-label small">Điểm ĐRL kỳ 1</label>
-                    <input type="number" id="drlSem1" class="form-control form-control-sm" placeholder="VD: 85"></div>
-                <button class="btn btn-gold w-100 btn-sm mb-2" onclick="calcDRL()">Tính toán ĐRL</button>
-                <div id="drlResult" class="alert alert-light border text-center small p-2" style="display:none;"></div>
+                <h5 class="section-title"><i class="fas fa-triangle-exclamation"></i> Cảnh báo học tập</h5>
+                <div id="sideWarn" class="small">Nhập bảng điểm theo học kỳ để đối chiếu.</div>
             </div>
-
             <div class="card p-3 mb-4">
-                <h5 class="section-title"><i class="fas fa-lightbulb"></i> Nên học lại môn nào?</h5>
+                <h5 class="section-title"><i class="fas fa-lightbulb"></i> Học lại / cải thiện</h5>
                 <div id="suggestionList" class="d-flex flex-column gap-2 mt-2"></div>
             </div>
         </div>
     </div>
+</section>
+
+<section id="panel-hocphan" class="tool-panel" hidden>
+    <div class="card p-4">
+        <h5 class="section-title">Điểm thành phần → điểm chữ</h5>
+        <p class="small text-muted">Điểm học phần làm tròn 1 chữ số thập phân rồi xếp chữ. Khóa 2021 trở đi (QĐ 1586 Điều 8): quá trình 0,2 và giữa kỳ 0,3, hoặc ngược lại, thi cuối kỳ 0,5 — chọn chiều nào là việc của đề cương. Khóa 2020 trở về trước (QĐ 1473 Điều 19): 0,1 + 0,1 + 0,3 + 0,5, và hai cột đầu có thể đổi.</p>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+            <button type="button" class="btn btn-sm btn-outline-ued" id="btnPreset1586">QĐ 1586: 0,2 + 0,3 + 0,5</button>
+            <button type="button" class="btn btn-sm btn-outline-ued" id="btnPreset1473">QĐ 1473: 0,1 + 0,1 + 0,3 + 0,5</button>
+            <button type="button" class="btn btn-sm btn-outline-ued" id="btnPresetBlank">Tự nhập theo đề cương</button>
+        </div>
+        <div id="partRows"></div>
+        <button type="button" class="btn btn-ued mt-2" id="btnComponent">Tính điểm cần đạt</button>
+        <div id="componentOut" class="mt-3"></div>
+    </div>
+</section>
+
+<section id="panel-gpa" class="tool-panel" hidden>
+    <div class="card p-4 mb-3">
+        <h5 class="section-title">GPA học kỳ, năm học, tích lũy</h5>
+        <p class="small text-muted mb-2">GPA = tổng (điểm hệ 4 × tín chỉ) / tổng tín chỉ, làm tròn 2 chữ số. P, I, X, R không vào mẫu số. Khóa 2021 trở đi: học phần chưa đạt lấy lần cuối, học phần đã đạt mà học cải thiện thì giữ điểm cao nhất; GPA tích lũy không cộng điểm 0 của môn đang F. Cột năm học chỉ là trung bình tham khảo — QĐ 1586 không đặt công thức GPA năm riêng.</p>
+        <div id="gpaDetail"></div>
+    </div>
+    <div class="card p-4">
+        <h5 class="section-title">Cần bao nhiêu để tới mốc xếp loại</h5>
+        <p class="small text-muted">Phần còn lại = tổng tín chỉ chương trình trừ tín chỉ đã đạt (kể cả học phần P). Điểm các học phần đang F không được giữ — coi như sẽ được thay bằng lần học lại. Đây là mức trung bình hệ 4 trên số tín chỉ còn thiếu, không phải cam kết xét tốt nghiệp.</p>
+        <div id="goalDetail"></div>
+    </div>
+</section>
+
+<section id="panel-drl" class="tool-panel" hidden>
+    <div class="card p-4">
+        <h5 class="section-title">Điểm rèn luyện</h5>
+        <p class="small text-muted">Các ý và điểm tối đa lấy từ phiếu tự đánh giá mẫu B01.QT824-02, học kỳ Thu 2025–2026, chấm theo Quyết định 3758/QĐ-ĐHĐN (hướng dẫn Thông tư 16/2015). Xếp loại 90/80/65/50/35 lấy từ Điều 9 thông tư vì phiếu không in lại các mốc đó. Mỗi ô không vượt điểm ghi trên phiếu.</p>
+        <div class="row g-3" id="drlFields">
+            <div class="col-md-6"><label class="form-label small">Ý thức học tập (0–20) · Điều 4</label><input class="form-control" id="drl_hoc_tap" type="number" min="0" max="20" value="0"></div>
+            <div class="col-md-6"><label class="form-label small">Chấp hành nội quy, quy chế (0–25) · Điều 5</label><input class="form-control" id="drl_noi_quy" type="number" min="0" max="25" value="0"></div>
+            <div class="col-md-6"><label class="form-label small">Hoạt động chính trị, xã hội, văn hóa, thể thao (0–20) · Điều 6</label><input class="form-control" id="drl_hoat_dong" type="number" min="0" max="20" value="0"></div>
+            <div class="col-md-6"><label class="form-label small">Ý thức công dân trong cộng đồng (0–25) · Điều 7</label><input class="form-control" id="drl_cong_dan" type="number" min="0" max="25" value="0"></div>
+            <div class="col-md-6"><label class="form-label small">Cán bộ lớp, đoàn thể hoặc thành tích đặc biệt (0–10) · Điều 8</label><input class="form-control" id="drl_can_bo" type="number" min="0" max="10" value="0"></div>
+            <div class="col-md-6"><label class="form-label small">Kỷ luật đang chịu (Điều 10)</label>
+                <select id="drlDiscipline" class="form-select">
+                    <option value="none">Không</option>
+                    <option value="khien_trach">Khiển trách — không xếp quá Khá</option>
+                    <option value="canh_cao">Cảnh cáo — không xếp quá Trung bình</option>
+                    <option value="dinh_chi">Đình chỉ học tập — không đánh giá trong thời gian này</option>
+                    <option value="buoc_thoi_hoc">Buộc thôi học — không đánh giá</option>
+                </select>
+            </div>
+        </div>
+        <button type="button" class="btn btn-gold mt-3" id="btnDrl">Xếp loại</button>
+        <div id="drlOut" class="mt-3"></div>
+        <p class="small text-muted mt-3 mb-0">Điều 9: 90–100 Xuất sắc; 80 đến dưới 90 Tốt; 65 đến dưới 80 Khá; 50 đến dưới 65 Trung bình; 35 đến dưới 50 Yếu; dưới 35 Kém. Hai học kỳ liên tiếp Yếu hoặc Kém thì phải tạm ngừng ít nhất một học kỳ (Điều 12 của thông tư này) — máy tính không tự chấm ý con nên không suy ra điều đó từ một học kỳ.</p>
+    </div>
+</section>
+
+<section id="panel-tintuc" class="tool-panel" hidden>
+    <div class="card p-4 mb-3">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h5 class="section-title mb-0">Bảng tin tuần</h5>
+            <button type="button" class="btn btn-sm btn-outline-ued" id="btnReloadNews">Tải lại</button>
+        </div>
+        <p class="small text-muted">Lấy bài công khai trên <a href="https://ued.udn.vn/" target="_blank" rel="noopener">ued.udn.vn</a> qua WordPress REST: bài mới và các chuyên mục Thông báo đào tạo, Thông báo người học, Lịch thi, Lịch tuần, Chế độ chính sách. Không có trang quản trị, không bài đăng tay. Cache trên máy chủ khoảng 30 phút; đĩa gói Render free mất khi dịch vụ ngủ hoặc deploy lại, khi đó trang tự tải lại.</p>
+        <div class="news-tabs" id="newsTabs"></div>
+        <div id="newsList" class="mt-3"></div>
+        <p class="small text-muted" id="newsMeta"></p>
+    </div>
+    <div class="row g-3">
+        <div class="col-lg-5">
+            <div class="card p-3">
+                <h5 class="section-title">Lịch rút từ bài viết</h5>
+                <p class="small text-muted">Ngày có dạng dd/mm/yyyy hoặc “ngày … tháng … năm …” đứng gần chữ hạn, đăng ký, thi, nộp. Không bịa ngày nếu bài không ghi đủ.</p>
+                <div id="newsCal"></div>
+            </div>
+        </div>
+        <div class="col-lg-7">
+            <div class="card p-3">
+                <h5 class="section-title">Facebook nhà trường</h5>
+                <p class="small text-muted">Fanpage <a href="https://www.facebook.com/ueddn" target="_blank" rel="noopener">facebook.com/ueddn</a> không trả bài viết đọc được khi chưa đăng nhập, nên không kéo bài. Plugin Page chính thức hiển thị dòng thời gian ngay trong trang.</p>
+                <iframe title="Fanpage Trường Đại học Sư phạm" class="fb-embed" src="https://www.facebook.com/plugins/page.php?href=https%3A%2F%2Fwww.facebook.com%2Fueddn&tabs=timeline&width=500&height=520&small_header=true&adapt_container_width=true&hide_cover=false&show_facepile=false" loading="lazy" allow="encrypted-media"></iframe>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section id="panel-quydinh" class="tool-panel" hidden>
+    <div class="card p-4">
+        <h5 class="section-title">Nguồn đã đối chiếu</h5>
+        <ul class="small">
+            <li><a href="https://vanban.chinhphu.vn/default.aspx?docid=203159&pageid=27160" target="_blank" rel="noopener">Thông tư 08/2021/TT-BGDĐT</a> — thang A 8,5–10 = 4; B 7,0–8,4 = 3; C 5,5–6,9 = 2; D 4,0–5,4 = 1; F dưới 4 = 0 (Điều 9, Điều 10). Xếp loại học lực Điều 10.5. Cảnh báo học tập Điều 11. Hạng tốt nghiệp và hạ một bậc Điều 14. Phòng Đào tạo UED ghi quy chế này <a href="https://daotao.ued.udn.vn/quy-dinh-ve-dao-tao/" target="_blank" rel="noopener">áp dụng từ khóa 2021</a>.</li>
+            <li><a href="https://daotao.ued.udn.vn/quyet-dinh-442-qd-dhsp-dt-ve-viec-ban-hanh-quy-dinh-dao-tao-trinh-do-dai-hoc-va-cao-dang-he-chinh-quy-theo-he-thong-tin-chi/" target="_blank" rel="noopener">Quyết định 1473/QĐ-ĐHSP-ĐT</a> — cùng thang chữ; trọng số 0,1 + 0,1 + 0,3 + 0,5 (Điều 19); GPA tích lũy lấy lần cao nhất (Điều 21); cảnh báo 0,8/1,0 và 1,2/1,4/1,6/1,8 (Điều 16); buộc thôi học ở lần cảnh báo thứ 3; hạ bậc khi học từ lần 2 vượt 5% (Điều 25). Áp dụng khóa 2020 trở về trước.</li>
+            <li><a href="https://congbao.chinhphu.vn/van-ban/thong-tu-so-16-2015-tt-bgddt-16264/11141.htm" target="_blank" rel="noopener">Thông tư 16/2015/TT-BGDĐT</a> — khung điểm rèn luyện Điều 4–8 và phân loại Điều 9–10.</li>
+        </ul>
+        <h6 class="fw-bold text-ued">Chưa kiểm chứng — không dùng làm ngưỡng</h6>
+        <ul class="small">
+            <li>Toàn văn Quyết định 1498/QĐ-ĐHSP ngày 31/7/2025 (sửa đổi, áp dụng từ khóa 2025) mới thấy tên trên trang Phòng Đào tạo, chưa đọc được điều khoản. Những chỗ 1498 có thể sửa (số lần cảnh báo, học cải thiện) được ghi chú trong kết quả, không bịa số.</li>
+            <li><a href="https://daotao.ued.udn.vn/wp-content/uploads/2018/02/2021-930_QD1586-QuyDinh-DaoTao-TrinhDo-DaiHoc.pdf" target="_blank" rel="noopener">Quyết định 1586/QĐ-ĐHSP ngày 30/9/2021</a> — thang A+ đến F và quy tắc học lại/cải thiện cho khóa 2021 trở đi. <a href="https://daotao.ued.udn.vn/quy-dinh-ve-dao-tao/" target="_blank" rel="noopener">Quyết định 1498/QĐ-ĐHSP ngày 31/7/2025</a> sửa một số điều cho khóa 2025; toàn văn các điều sửa được ghi trong <code>docs/quy-che-nguon.md</code>. Mốc năm của chương trình 11 học kỳ chưa đưa vào máy tính.</li>
+            <li>Trang đào tạo có mục “điều chỉnh tổng số tín chỉ tích lũy lên 135”, chưa đọc được phạm vi áp dụng. Ô tổng tín chỉ mặc định 130 theo Điều 2 và Điều 24 QĐ 1473; bạn sửa nếu chương trình của khóa mình khác.</li>
+            <li>Mốc năm học 34/65/99 tín chỉ là của QĐ 1473 Điều 15. Khóa 2021+ dùng cách chia N/M của Thông tư 08 Điều 10.6 (M mặc định = tổng tín chỉ / 4).</li>
+            <li>Chưa có biểu mẫu điểm rèn luyện chi tiết của riêng UED trong các trang đã mở.</li>
+        </ul>
+        <p class="small mb-0">Chi tiết trích dẫn nằm trong <code>docs/quy-che-nguon.md</code> của mã nguồn.</p>
+    </div>
+</section>
 </main>
 <footer class="ued-footer text-center py-3 small">
-    Dữ liệu môn học: Chương trình đào tạo khóa 2025 — <a href="https://ued.udn.vn/2025/11/09/chuong-trinh-dao-tao-ke-hoach-dao-tao-ap-dung-cho-khoa-ts-2025/" target="_blank" rel="noopener">ued.udn.vn</a>
+    Môn học: <a href="https://ued.udn.vn/2025/11/09/chuong-trinh-dao-tao-ke-hoach-dao-tao-ap-dung-cho-khoa-ts-2025/" target="_blank" rel="noopener">CTĐT khóa 2025, ued.udn.vn</a>
+    · Điểm: Thông tư 08/2021 và QĐ 1473/QĐ-ĐHSP-ĐT
+    · Bảng tin: bài công khai ued.udn.vn
 </footer>
 <script src="{{ url_for('static', filename='script.js') }}"></script>
+<script src="{{ url_for('static', filename='academics-ui.js') }}"></script>
 </body>
 </html>

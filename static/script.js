@@ -1,10 +1,11 @@
-let transcriptData = JSON.parse(localStorage.getItem('kanna_transcript_v2')) || [];
+var transcriptData = JSON.parse(localStorage.getItem('kanna_transcript_v2')) || [];
 const gradeMap = { 'A+': 4.0, 'A': 4.0, 'B+': 3.5, 'B': 3.0, 'C+': 2.5, 'C': 2.0, 'D+': 1.5, 'D': 1.0, 'F': 0.0 };
 
 function saveData() {
     localStorage.setItem('kanna_transcript_v2', JSON.stringify(transcriptData));
     renderTable();
     calculateStats();
+    if (window.refreshAcademics) window.refreshAcademics();
 }
 
 let debounceTimer;
@@ -57,14 +58,15 @@ function convertGrade() {
 
     let char = '';
     if (!isNaN(val)) {
-        if (val >= 9.0) char = 'A+';
-        else if (val >= 8.5) char = 'A';
-        else if (val >= 8.0) char = 'B+';
-        else if (val >= 7.0) char = 'B';
-        else if (val >= 6.5) char = 'C+';
-        else if (val >= 5.5) char = 'C';
-        else if (val >= 5.0) char = 'D+';
-        else if (val >= 4.0) char = 'D';
+        const rounded = Math.round(val * 10) / 10;
+        if (rounded >= 9.5) char = 'A+';
+        else if (rounded >= 8.5) char = 'A';
+        else if (rounded >= 8.0) char = 'B+';
+        else if (rounded >= 7.0) char = 'B';
+        else if (rounded >= 6.5) char = 'C+';
+        else if (rounded >= 5.5) char = 'C';
+        else if (rounded >= 5.0) char = 'D+';
+        else if (rounded >= 4.0) char = 'D';
         else char = 'F';
     }
     document.getElementById('inputGrade4').value = char;
@@ -75,8 +77,15 @@ function addManualSubject() {
     const credits = parseInt(document.getElementById('inputCredits').value);
     const grade = document.getElementById('inputGrade4').value;
 
-    if (name && credits && grade) {
-        transcriptData.push({ ten_mon: name, tin_chi: credits, diem_he_4: grade, sim_grade: null });
+    const score10 = parseFloat(document.getElementById('inputGrade10').value);
+    if (name && credits && grade && !isNaN(score10)) {
+        transcriptData.push({
+            ten_mon: name, tin_chi: credits, diem_he_4: grade, diem_10: score10, sim_grade: null,
+            nam_hoc: document.getElementById('inputYear').value,
+            hoc_ky: document.getElementById('inputTerm').value,
+            lan: parseInt(document.getElementById('inputAttempt').value, 10) || 1,
+            pass_only: document.getElementById('inputPassOnly').checked
+        });
         saveData();
         document.getElementById('inputName').value = '';
         document.getElementById('inputGrade10').value = '';
@@ -148,7 +157,16 @@ function confirmOCR() {
     let count = 0;
     document.querySelectorAll('.ocr-chk:checked').forEach(chk => {
         const m = pendingOCR[parseInt(chk.dataset.i)];
-        if (!transcriptData.some(s => s.ten_mon === m.ten_mon)) { transcriptData.push({ ...m, sim_grade: null }); count++; }
+        if (!transcriptData.some(s => s.ten_mon === m.ten_mon && s.nam_hoc === (document.getElementById('inputYear') || {}).value && s.hoc_ky === (document.getElementById('inputTerm') || {}).value && s.lan === (parseInt((document.getElementById('inputAttempt') || {}).value, 10) || 1))) {
+            transcriptData.push({
+                ...m, sim_grade: null,
+                nam_hoc: document.getElementById('inputYear').value,
+                hoc_ky: document.getElementById('inputTerm').value,
+                lan: parseInt(document.getElementById('inputAttempt').value, 10) || 1,
+                pass_only: false
+            });
+            count++;
+        }
     });
     saveData();
     document.getElementById('ocrReview').innerHTML = `<div class="alert alert-success small mb-0">Đã thêm ${count} môn vào bảng điểm.</div>`;
@@ -212,10 +230,11 @@ function renderTable() {
         tr.innerHTML = `
             <td>${displayName}</td>
             <td class="text-center fw-bold">${item.tin_chi}</td>
-            <td class="text-center"><span class="badge-grade ${badgeClass}">${item.diem_he_4}</span></td>
+            <td class="text-center"><span class="badge-grade ${badgeClass}">${item.diem_he_4}</span>${item.diem_10 != null ? `<div class="small text-muted">${item.diem_10}</div>` : ''}</td>
+            <td class="text-center small">${item.nam_hoc ? `${item.nam_hoc}<br>HK${item.hoc_ky === 'he' ? ' hè' : item.hoc_ky} · lần ${item.lan || 1}` : '<span class="text-muted">chưa gắn kỳ</span>'}</td>
             <td class="text-center">
                 <select class="form-select form-select-sm" onchange="updateSim(${index}, this.value)">
-                    <option value="" ${selectVal == "" ? "selected" : ""}>-- Giữ --</option>
+                    <option value="" ${selectVal == "" ? "selected" : ""}>— Giữ —</option>
                     <option value="A+" ${selectVal == "A+" ? "selected" : ""}>A+</option>
                     <option value="A" ${selectVal == "A" ? "selected" : ""}>A</option>
                     <option value="B+" ${selectVal == "B+" ? "selected" : ""}>B+</option>
@@ -283,15 +302,14 @@ function calculateStats() {
     else if (diff < 0) diffEl.parentElement.className = 'card score-box down';
     else diffEl.parentElement.className = 'card score-box diff';
 
-    const target = parseInt(document.getElementById('targetCredits').value);
-    const percent = Math.min(100, Math.round((totalTin / target) * 100));
+    const targetEl = document.getElementById('targetCredits');
+    const target = targetEl ? (parseInt(targetEl.value, 10) || 130) : 130;
+    const passed = transcriptData.reduce((s, m) => s + ((gradeMap[m.diem_he_4] > 0 || m.pass_only) ? m.tin_chi : 0), 0);
+    const percent = Math.min(100, Math.round((passed / target) * 100));
     const bar = document.getElementById('gradProgressBar');
     bar.style.width = percent + "%";
     bar.innerText = percent + "%";
-    document.getElementById('progressText').innerText = `${totalTin} / ${target} TC`;
-
-    const rem = Math.max(0, target - totalTin);
-    document.getElementById('remainingCredits').value = rem;
+    document.getElementById('progressText').innerText = `${passed} / ${target} TC đã đạt`;
 }
 
 function generateSuggestions() {
@@ -327,9 +345,18 @@ function generateSuggestions() {
 function fillSim(name) {
     let idx = transcriptData.findIndex(m => m.ten_mon === name);
     if (idx !== -1) {
-        updateSim(idx, "A+");
+        updateSim(idx, "A");
         document.querySelectorAll('#transcriptTable tr')[idx].scrollIntoView({ behavior: "smooth", block: "center" });
     }
+}
+
+function exportTranscript() {
+    const blob = new Blob([JSON.stringify({ savedAt: new Date().toISOString(), courses: transcriptData }, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'bang-diem-ued.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
 }
 
 function calculateGraduationPath() {

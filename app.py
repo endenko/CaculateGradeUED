@@ -20,6 +20,8 @@ from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
 
 import db
+import newsfeed
+import regulations
 from ocr import engines
 from utils import no_accent_vietnamese, normalize
 
@@ -139,18 +141,12 @@ def reconstruct_lines(word_list, mode):
 # 🛡️ TRUNG TÂM SỬA TÊN & LẤY TÍN CHỈ CỨU HỘ
 # ========================================================
 def quy_doi_chuan(diem_so):
+    """Thang A/B/C/D/F của Thông tư 08/2021 Điều 9 và QĐ 1473 Điều 20. Không có A+/B+."""
     try:
         clean = re.sub(r"[^\d,\.]", "", str(diem_so))
         d = float(clean.replace(',', '.'))
-        if d >= 9.0: return 'A+'
-        if d >= 8.5: return 'A'
-        if d >= 8.0: return 'B+'
-        if d >= 7.0: return 'B'
-        if d >= 6.5: return 'C+'
-        if d >= 5.5: return 'C'
-        if d >= 5.0: return 'D+'
-        if d >= 4.0: return 'D'
-        return 'F'
+        letter, _pts = regulations.letter_from_score10(d)
+        return letter
     except Exception:
         return 'F'
 
@@ -280,7 +276,8 @@ def parse_computer(lines):
                 "ten_mon": ten_mon_chuan,
                 "percentage": similarity_pct,
                 "tin_chi": int(tin_chi_ocr),
-                "diem_he_4": diem_chu
+                "diem_he_4": diem_chu,
+                "diem_10": diem_10_float if 0 <= diem_10_float <= 10 else None,
             })
     return results
 
@@ -371,7 +368,8 @@ def parse_handwriting(lines):
                 "ten_mon": ten_mon_chuan,
                 "percentage": similarity_pct,
                 "tin_chi": final_tin_chi,
-                "diem_he_4": final_diem_he_4
+                "diem_he_4": final_diem_he_4,
+                "diem_10": diem_10 if 0 <= diem_10 <= 10 else None,
             })
     return results
 
@@ -469,6 +467,47 @@ def scan_detail_score():
         except Exception as e:
             return jsonify({"success": False, "error": str(e)})
     return jsonify({"success": False, "error": "File không hợp lệ"})
+
+
+@app.route('/api/academics', methods=['POST'])
+def api_academics():
+    try:
+        return jsonify(regulations.summarize(request.get_json(force=True) or {}))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@app.route('/api/components', methods=['POST'])
+def api_components():
+    data = request.get_json(force=True) or {}
+    try:
+        return jsonify(regulations.component_result(data.get("parts") or []))
+    except (ValueError, KeyError, TypeError) as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@app.route('/api/drl', methods=['POST'])
+def api_drl():
+    data = request.get_json(force=True) or {}
+    try:
+        return jsonify(regulations.drl_result(data.get("scores") or {}, data.get("discipline") or "none"))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@app.route('/api/news')
+def api_news():
+    board = newsfeed.get_board()
+    return jsonify({
+        "posts": board.get("posts") or [],
+        "calendar": board.get("calendar") or [],
+        "source": board.get("source"),
+        "facebook": board.get("facebook"),
+        "cache": board.get("cache"),
+        "stale": bool(board.get("stale")),
+        "error": board.get("error"),
+        "fetched_at": board.get("fetched_at_epoch"),
+    })
 
 
 db.init_db()

@@ -30,6 +30,18 @@ pinned: false
 
 ---
 
+## Quy định điểm dùng trong ứng dụng (2025–2026)
+
+Máy tính bám văn bản đã đọc được, không tự đặt ngưỡng. Trang **Nguồn quy định** trong ứng dụng và file `docs/quy-che-nguon.md` ghi đường dẫn.
+
+- Thang chữ khóa 2021 trở đi: Quyết định 1586/QĐ-ĐHSP Điều 8 (A+ từ 9,5 = 4,0; A từ 8,5 = 4,0; B+ = 3,5; B = 3,0; C+ = 2,5; C = 2,0; D+ = 1,5; D = 1,0; F = 0). Khóa 2020 trở về trước: Quyết định 1473, chỉ A/B/C/D/F.
+- Cảnh báo học tập: Điều 11 Thông tư 08 và Điều 16 QĐ 1473.
+- Hạ một bậc tốt nghiệp: Điều 14.3 Thông tư 08 và Điều 25.2 QĐ 1473.
+- Điểm rèn luyện: Thông tư 16/2015/TT-BGDĐT Điều 4–10. Chưa thấy biểu mẫu chia nhỏ của riêng UED.
+- Bảng tin chỉ kéo bài công khai `https://ued.udn.vn/wp-json/wp/v2/posts`, cache khoảng 30 phút (`NEWS_CACHE_TTL`, mặc định file `/tmp/ued-news-cache.json`). Đĩa gói Render free mất khi dịch vụ ngủ hoặc deploy; cache được tạo lại khi có người mở bảng tin. Không có trang quản trị. Facebook (`facebook.com/ueddn`) không kéo bài vì không đọc được khi chưa đăng nhập — chỉ nhúng plugin Page.
+
+Toàn văn Quyết định 1498/QĐ-ĐHSP ngày 31/7/2025 (áp dụng từ khóa 2025) chưa lấy được, nên ứng dụng không kết luận buộc thôi học cho khóa 2021+ chỉ từ số lần cảnh báo.
+
 ## 🎯 Tổng quan hệ thống
 
 **UED Calculate Grade** là ứng dụng web được xây dựng bằng **Flask (Python)**, có khả năng:

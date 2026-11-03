@@ -7,8 +7,27 @@
 body{font-family:'Be Vietnam Pro',system-ui,sans-serif;background:linear-gradient(180deg,#f3f7fd 0,#fdfbf3 100%);color:var(--text);min-height:100vh}
 .text-ued{color:var(--ued-blue)!important}
 .ued-hero{background:radial-gradient(circle at 85% -20%,rgba(245,184,0,.45),transparent 45%),linear-gradient(120deg,var(--ued-blue-dark),var(--ued-blue));color:#fff;border-bottom:5px solid var(--ued-gold)}
-.ued-logo{width:84px;height:84px;border-radius:50%;background:#fff;border:4px solid var(--ued-gold);display:grid;place-items:center;box-shadow:0 6px 20px rgba(0,0,0,.25);flex-shrink:0}
-.ued-logo span{font-weight:800;color:var(--ued-blue);font-size:1.4rem;letter-spacing:1px}
+.ued-logo{width:84px;height:84px;border-radius:50%;background:#fff;border:4px solid var(--ued-gold);object-fit:cover;box-shadow:0 6px 20px rgba(0,0,0,.25);flex-shrink:0}
+.ued-nav{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid #e4ebf5}
+.ued-nav .container{overflow-x:auto;flex-wrap:nowrap}
+.nav-pill{border:1px solid #d6e0ee;background:#fff;color:var(--ued-blue);border-radius:999px;padding:.35rem .8rem;font-weight:600;font-size:.85rem;white-space:nowrap}
+.nav-pill.active,.nav-pill:hover{background:var(--ued-blue);color:#fff;border-color:var(--ued-blue)}
+.warn-chip{background:#fff6f4;border-left:4px solid #c0392b;padding:.4rem .6rem;border-radius:8px;margin-bottom:.4rem}
+.goal-row{padding:.45rem 0;border-bottom:1px solid #eef2f7}
+.news-tabs{display:flex;gap:.4rem;overflow-x:auto;padding-bottom:.2rem}
+.news-item{padding:.7rem 0;border-bottom:1px solid #eef2f7}
+.news-item a{font-weight:700;color:var(--ued-blue);text-decoration:none}
+.cal-item{padding:.45rem 0;border-bottom:1px solid #eef2f7}
+.fb-embed{width:100%;height:520px;border:0;border-radius:12px;background:#f4f7fb}
+.drl-score{font-size:2.4rem;font-weight:800;color:var(--ued-blue);line-height:1}
+.drl-score span{font-size:1rem;color:#6b7a90}
+@media (max-width:576px){.ued-logo{width:64px;height:64px}}
+@media print{
+  .no-print,.ued-nav,.tool-panel[hidden]{display:none!important}
+  #panel-bangdiem{display:block!important}
+  body{background:#fff}
+  .card{box-shadow:none;border:1px solid #ddd}
+}
 .ued-kicker{color:var(--ued-gold);font-weight:700;font-size:.78rem;letter-spacing:.12em}
 .ued-title{font-weight:800;font-size:clamp(1.6rem,4vw,2.4rem);margin:.15rem 0}
 .ued-sub{opacity:.85;font-size:.95rem}
