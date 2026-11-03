@@ -67,12 +67,28 @@
         return `${year} · Học kỳ ${ky === 'he' ? 'hè' : ky}`;
     }
     function currentKey() {
-        return ($('semSelect') && $('semSelect').value) || 'unknown';
+        const value = $('semSelect') && $('semSelect').value;
+        return value || 'unknown';
     }
-    function visible() {
+    function tongKey(c) {
+        if (!c || c.term_unknown || !c.nam_hoc || !c.hoc_ky) return 'unknown';
+        return c.nam_hoc + '|' + c.hoc_ky;
+    }
+    function rowsForView() {
         const key = currentKey();
-        return t2.filter(c => semKey(c) === key);
+        const own = t2.filter(c => semKey(c) === key);
+        const names = new Set(own.map(c => c.ten_mon));
+        const extra = (window.transcriptData || []).filter(c => tongKey(c) === key && !names.has(c.ten_mon)).map(c => ({
+            id: 'tong-' + (c.nam_hoc || '') + '-' + (c.hoc_ky || '') + '-' + c.ten_mon,
+            ten_mon: c.ten_mon, tin_chi: c.tin_chi, letter: c.diem_he_4,
+            points: POINTS[c.diem_he_4] ?? null, score10: c.diem_10 ?? null,
+            bp: null, gk: null, ck: null, nam_hoc: c.nam_hoc || null, hoc_ky: c.hoc_ky || null,
+            term_unknown: !!c.term_unknown, lan: c.lan || 1, in_progress: false,
+            from_ocr: true, fromTong: true,
+        }));
+        return own.concat(extra);
     }
+    function visible() { return rowsForView(); }
     function save() { localStorage.setItem('ued_table2', JSON.stringify(t2)); }
     function blank(partial) {
         return Object.assign({
@@ -82,18 +98,32 @@
         }, partial);
     }
 
+    function collectKeys() {
+        const keys = [];
+        const add = (k) => { if (k && !keys.includes(k)) keys.push(k); };
+        t2.forEach(c => add(semKey(c)));
+        (window.transcriptData || []).forEach(c => add(tongKey(c)));
+        const year = $('assignYear') && $('assignYear').value;
+        const term = $('assignTerm') && $('assignTerm').value;
+        if (year && term) add(year + '|' + term);
+        if (!keys.length) add('2025-2026|2');
+        keys.sort((a, b) => (a === 'unknown') - (b === 'unknown') || (a < b ? 1 : a > b ? -1 : 0));
+        return keys;
+    }
     function fillSemSelect() {
         const sel = $('semSelect');
         if (!sel) return;
         const prev = sel.value;
-        const keys = [];
-        t2.forEach(c => { const k = semKey(c); if (!keys.includes(k)) keys.push(k); });
-        if (!keys.length) keys.push('unknown');
-        keys.sort((a, b) => (a === 'unknown') - (b === 'unknown') || (a < b ? 1 : -1));
+        const keys = collectKeys();
         sel.innerHTML = keys.map(k => `<option value="${esc(k)}">${esc(semLabel(k))}</option>`).join('');
         if (keys.includes(prev)) sel.value = prev;
-        else if (keys.includes('unknown') && keys.length === 1) sel.value = 'unknown';
         else sel.value = keys.find(k => k !== 'unknown') || keys[0];
+    }
+    function syncAssignFromKey(key) {
+        if (!key || key === 'unknown' || !$('assignYear')) return;
+        const [year, ky] = key.split('|');
+        if ([...$('assignYear').options].some(o => o.value === year)) $('assignYear').value = year;
+        if ([...$('assignTerm').options].some(o => o.value === ky)) $('assignTerm').value = ky;
     }
 
     function renderBody() {
@@ -119,14 +149,31 @@
         }).join('');
         body.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => openEditor(btn.dataset.edit)));
         body.querySelectorAll('[data-del]').forEach(btn => btn.addEventListener('click', () => {
-            t2 = t2.filter(c => c.id !== btn.dataset.del);
+            const row = visible().find(c => c.id === btn.dataset.del);
+            if (row && row.fromTong) {
+                window.transcriptData = (window.transcriptData || []).filter(c => tongKey(c) + c.ten_mon !== tongKey(row) + row.ten_mon);
+                if (typeof saveData === 'function') saveData();
+            } else {
+                t2 = t2.filter(c => c.id !== btn.dataset.del);
+            }
             if (editingId === btn.dataset.del) closeEditor();
             save(); fillSemSelect(); renderBody(); renderOptions();
         }));
     }
 
     function openEditor(id) {
-        editingId = id;
+        let row = t2.find(c => c.id === id) || visible().find(c => c.id === id);
+        if (row && row.fromTong) {
+            const copy = blank({
+                ten_mon: row.ten_mon, tin_chi: row.tin_chi, letter: row.letter, points: row.points,
+                score10: row.score10, nam_hoc: row.nam_hoc, hoc_ky: row.hoc_ky,
+                term_unknown: row.term_unknown, lan: row.lan, in_progress: false, from_ocr: true,
+            });
+            t2.push(copy);
+            save();
+            row = copy;
+        }
+        editingId = row ? row.id : id;
         const box = $('courseEditor');
         if (box) box.hidden = false;
         renderEditor();
@@ -216,7 +263,16 @@
         }).then(r => r.json()).then(data => {
             if (req !== optionReq) return;
             const options = (data.options || []).slice(0, 5);
-            if (!options.length) { host.innerHTML = '<div class="text-muted">Chưa có phương án.</div>'; return; }
+            const first = options[0];
+            if (!options.length || (first && (first.kind === 'empty' || first.kind === 'idle'))) {
+                if (first && first.kind === 'idle') {
+                    const gpa = first.gpa == null ? '' : `GPA học kỳ hiện tại ${Number(first.gpa).toFixed(2)}. `;
+                    host.innerHTML = `<div class="text-muted">${gpa}Không có môn đang chờ điểm cuối kỳ.</div>`;
+                } else {
+                    host.innerHTML = '<div class="text-muted">Chưa có môn trong học kỳ này.</div>';
+                }
+                return;
+            }
             host.innerHTML = options.map((opt, i) => {
                 const lines = (opt.courses || []).map(c => {
                     const ck = c.ck_over || c.min_ck == null ? 'CK &gt; 10' : 'CK ' + Number(c.min_ck).toFixed(1);
@@ -249,8 +305,11 @@
             fixed.push({ id: 't1-' + c.ten_mon, ten_mon: c.ten_mon, credits: c.tin_chi, points: POINTS[letter], letter });
         });
         visible().forEach(c => {
+            const already = fixed.some(r => r.ten_mon === c.ten_mon);
             if (c.bp != null && c.gk != null && c.ck == null) variable.push(c);
-            else if (c.points != null) fixed.push({ id: c.id, ten_mon: c.ten_mon, credits: c.tin_chi, points: c.points, letter: c.letter });
+            else if (c.points != null && !already && !c.fromTong) {
+                fixed.push({ id: c.id, ten_mon: c.ten_mon, credits: c.tin_chi, points: c.points, letter: c.letter });
+            }
         });
         let assignment = null;
         const order = [['D', 4, 1], ['D+', 5, 1.5], ['C', 5.5, 2], ['C+', 6.5, 2.5], ['B', 7, 3], ['B+', 8, 3.5], ['A', 8.5, 4]];
@@ -302,11 +361,30 @@
     function bind() {
         const storedW = JSON.parse(localStorage.getItem('ued_weights') || 'null');
         if (storedW) { $('wBp').value = storedW[0]; $('wGk').value = storedW[1]; $('wCk').value = storedW[2]; }
-        $('semSelect').addEventListener('change', () => { renderBody(); renderOptions(); if (editing()) renderEditor(); });
+        $('semSelect').addEventListener('change', () => {
+            syncAssignFromKey($('semSelect').value);
+            renderBody(); renderOptions(); if (editing()) renderEditor();
+        });
+        const viewPickedTerm = () => {
+            const key = $('assignYear').value + '|' + $('assignTerm').value;
+            fillSemSelect();
+            $('semSelect').value = key;
+            renderBody(); renderOptions();
+        };
+        $('assignYear').addEventListener('change', viewPickedTerm);
+        $('assignTerm').addEventListener('change', viewPickedTerm);
         $('semTarget').addEventListener('change', () => renderOptions());
         $('btnAssignTerm').addEventListener('click', () => {
             const year = $('assignYear').value, ky = $('assignTerm').value;
-            visible().forEach(c => { c.nam_hoc = year; c.hoc_ky = ky; c.term_unknown = false; });
+            visible().forEach(c => {
+                if (c.fromTong) {
+                    const src = (window.transcriptData || []).find(s => s.ten_mon === c.ten_mon && tongKey(s) === semKey(c));
+                    if (src) { src.nam_hoc = year; src.hoc_ky = ky; src.term_unknown = false; }
+                } else {
+                    c.nam_hoc = year; c.hoc_ky = ky; c.term_unknown = false;
+                }
+            });
+            if (typeof saveData === 'function') saveData();
             save(); fillSemSelect(); $('semSelect').value = year + '|' + ky; renderBody(); renderEditor(); renderOptions();
         });
         let timer;
@@ -372,46 +450,49 @@
     }
 
     window.boardsAddOcr = function (target, rows, term) {
+        // Every scanned row belongs to the semester (Điểm học phần), including
+        // in-progress courses with no score. Graded rows are also copied to
+        // Điểm tổng. CPA counts the cumulative copy only, so nothing is added twice.
         const known = term && term.nam_hoc && term.hoc_ky;
+        if (!window.transcriptData) window.transcriptData = [];
         rows.forEach(m => {
-            if (String(target) === '1') {
-                const letter = m.in_progress ? null : (POINTS[m.diem_he_4] != null ? m.diem_he_4 : (m.diem_10 != null ? letterOf(m.diem_10)[0] : null));
-                if (!letter) return;
-                if (!window.transcriptData.some(s => s.ten_mon === m.ten_mon && s.nam_hoc === (known ? term.nam_hoc : '') && s.hoc_ky === (known ? term.hoc_ky : ''))) {
-                    window.transcriptData.push({
-                        ...m, diem_he_4: letter, sim_grade: null,
-                        nam_hoc: known ? term.nam_hoc : '',
-                        hoc_ky: known ? term.hoc_ky : '',
-                        lan: m.lan || 1,
-                        term_unknown: !known,
-                        pass_only: false,
-                    });
+            const letter = m.in_progress ? null : (POINTS[m.diem_he_4] != null ? m.diem_he_4 : (m.diem_10 != null ? letterOf(m.diem_10)[0] : null));
+            const nam = known ? term.nam_hoc : null;
+            const ky = known ? term.hoc_ky : null;
+            const key = known ? nam + '|' + ky : 'unknown';
+            if (!t2.some(c => c.ten_mon === m.ten_mon && semKey(c) === key)) {
+                if (letter) {
+                    const [L, pts] = m.diem_10 != null ? letterOf(m.diem_10) : [letter, POINTS[letter]];
+                    t2.push(blank({
+                        ten_mon: m.ten_mon, tin_chi: m.tin_chi, letter: L, points: pts, score10: m.diem_10,
+                        in_progress: false, from_ocr: true, lan: m.lan || 1,
+                        nam_hoc: nam, hoc_ky: ky, term_unknown: !known,
+                    }));
+                } else {
+                    t2.push(blank({
+                        ten_mon: m.ten_mon, tin_chi: m.tin_chi, in_progress: true, lan: m.lan || 1,
+                        nam_hoc: nam, hoc_ky: ky, term_unknown: !known,
+                    }));
                 }
-            } else if (!m.in_progress && (m.diem_10 != null || POINTS[m.diem_he_4] != null)) {
-                const [letter, points] = m.diem_10 != null ? letterOf(m.diem_10) : [m.diem_he_4, POINTS[m.diem_he_4]];
-                t2.push(blank({
-                    ten_mon: m.ten_mon, tin_chi: m.tin_chi, letter, points, score10: m.diem_10,
-                    in_progress: false, from_ocr: true, lan: m.lan || 1,
-                    nam_hoc: known ? term.nam_hoc : null, hoc_ky: known ? term.hoc_ky : null, term_unknown: !known,
-                }));
-            } else {
-                t2.push(blank({
-                    ten_mon: m.ten_mon, tin_chi: m.tin_chi, in_progress: true, lan: m.lan || 1,
-                    nam_hoc: known ? term.nam_hoc : null, hoc_ky: known ? term.hoc_ky : null, term_unknown: !known,
-                }));
+            }
+            if (letter && !window.transcriptData.some(s => s.ten_mon === m.ten_mon && tongKey(s) === key)) {
+                window.transcriptData.push({
+                    ...m, diem_he_4: letter, sim_grade: null,
+                    nam_hoc: nam || '', hoc_ky: ky || '', lan: m.lan || 1,
+                    term_unknown: !known, pass_only: false,
+                });
             }
         });
         save();
-        if (String(target) === '1' && typeof saveData === 'function') saveData();
+        if (typeof saveData === 'function') saveData();
         fillSemSelect();
-        if (String(target) !== '1') {
-            const key = known ? term.nam_hoc + '|' + term.hoc_ky : 'unknown';
-            if ([...$('semSelect').options].some(o => o.value === key)) $('semSelect').value = key;
-            if (known) { $('assignYear').value = term.nam_hoc; $('assignTerm').value = term.hoc_ky; }
-            renderBody(); renderOptions();
-            const tab = document.querySelector('.site-menu [data-panel="diemhp"]');
-            if (tab) tab.click();
-        }
+        const key = known ? term.nam_hoc + '|' + term.hoc_ky : 'unknown';
+        if ([...$('semSelect').options].some(o => o.value === key)) $('semSelect').value = key;
+        syncAssignFromKey(key);
+        renderBody(); renderOptions();
+        const panel = (String(target) === '1' && !rows.some(m => m.in_progress)) ? 'bangdiem' : 'diemhp';
+        const tab = document.querySelector(`.site-menu [data-panel="${panel}"]`);
+        if (tab) tab.click();
     };
 
     if ($('hpBody')) {

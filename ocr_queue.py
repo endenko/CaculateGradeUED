@@ -16,8 +16,9 @@ import traceback
 import uuid
 from collections import OrderedDict
 
-# Trước khi có mẫu thật, 6 giây nằm trong khoảng đo được (~1–14s), không phải 20/40/60.
-_PRIOR_SECONDS = float(os.environ.get("OCR_AVG_SECONDS", "6"))
+# Render free (~0.1 CPU) takes about 26s for a real portal page. Use that until
+# this process has its own recent durations.
+_PRIOR_SECONDS = float(os.environ.get("OCR_AVG_SECONDS", "24"))
 _TIMES_PATH = os.environ.get("OCR_TIMES_PATH", "/tmp/ued_ocr_times.json")
 _RECENT_LIMIT = 8
 

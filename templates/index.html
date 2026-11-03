@@ -36,7 +36,7 @@
             <span class="menu-bars" aria-hidden="true"><span></span><span></span><span></span></span>
         </button>
         <nav class="site-menu" id="siteMenu" aria-label="Mục">
-            <button type="button" data-panel="bangdiem" class="active">Bảng 1</button>
+            <button type="button" data-panel="bangdiem" class="active">Điểm tổng</button>
             <button type="button" data-panel="diemhp">Điểm học phần</button>
             <button type="button" data-panel="muctieu">Mục tiêu</button>
             <button type="button" data-panel="drl">Điểm rèn luyện</button>
@@ -132,8 +132,8 @@
                 </div>
                 <div class="d-flex flex-wrap gap-3 mb-2 small">
                     <span class="fw-semibold">Đưa kết quả vào</span>
-                    <label class="mb-0"><input type="radio" name="ocrTarget" value="1" checked> Bảng 1 — các kỳ trước</label>
-                    <label class="mb-0"><input type="radio" name="ocrTarget" value="2"> Điểm học phần — học kỳ này</label>
+                    <label class="mb-0"><input type="radio" name="ocrTarget" value="1"> Điểm tổng — điểm đã có</label>
+                    <label class="mb-0"><input type="radio" name="ocrTarget" value="2" checked> Điểm học phần — học kỳ này</label>
                 </div>
                 <div id="ocrQueue" class="small text-ued mb-2" hidden></div>
                 <div class="mode-switch mb-3" role="group">
@@ -155,7 +155,7 @@
 
             <div class="card p-4 mb-4">
                 <div class="d-flex flex-wrap gap-2 justify-content-between mb-3">
-                    <h5 class="section-title mb-0"><i class="fas fa-list-ul"></i> Bảng 1 — điểm tích lũy</h5>
+                    <h5 class="section-title mb-0"><i class="fas fa-list-ul"></i> Điểm tổng — điểm tích lũy</h5>
                     <div class="btn-group flex-wrap">
                         <button class="btn btn-sm btn-outline-ued" onclick="resetSimulation()">Reset giả lập</button>
                         <button class="btn btn-sm btn-outline-ued" onclick="exportTranscript()">Xuất JSON</button>
@@ -178,7 +178,7 @@
         <div class="col-lg-4">
             <div class="card p-3 mb-4">
                 <h5 class="section-title"><i class="fas fa-lightbulb"></i> Nên học lại</h5>
-                <p class="small text-muted">Môn từ 3 tín chỉ trở lên, điểm C, D+, D hoặc F được tô đỏ ở bảng 1.</p>
+                <p class="small text-muted">Môn từ 3 tín chỉ trở lên, điểm C, D+, D hoặc F được tô đỏ ở Điểm tổng.</p>
                 <div id="suggestionList" class="d-flex flex-column gap-2 mt-2"></div>
             </div>
         </div>
@@ -266,8 +266,8 @@
 
 <section id="panel-muctieu" class="tool-panel" hidden>
     <div class="card p-3 p-md-4">
-        <h5 class="section-title">Mục tiêu CPA (Bảng 1 + học kỳ đang xem)</h5>
-        <p class="small text-muted">GPA tích lũy gồm các môn Bảng 1 và các môn đã có điểm ở học kỳ đang chọn trong Điểm học phần. Môn đang chờ cuối kỳ được phân bổ mức thấp nhất vẫn đạt mốc.</p>
+        <h5 class="section-title">Mục tiêu CPA (Điểm tổng + học kỳ đang xem)</h5>
+        <p class="small text-muted">GPA tích lũy gồm các môn Điểm tổng và các môn đang chờ cuối kỳ ở học kỳ đang chọn. Môn đã có điểm ở cả hai nơi chỉ tính một lần.</p>
         <div class="row g-2 align-items-end">
             <div class="col-md-6"><label class="form-label small">Mốc</label>
                 <select id="solveTarget" class="form-select form-select-sm">

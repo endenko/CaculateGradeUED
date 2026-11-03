@@ -9,6 +9,17 @@ from solver import semester_options
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "portal_hk2_2024.png")
 
 
+class NameTests(unittest.TestCase):
+    def test_strips_curriculum_heading(self):
+        from db import clean_course_name
+        self.assertEqual(
+            clean_course_name("Kiến thức Nghiệp vụ sư phạm Phát triển chương trình dạy học môn Tin học"),
+            "Phát triển chương trình dạy học môn Tin học",
+        )
+        self.assertEqual(clean_course_name("Kiến thức Cơ sở ngành 14 Giải tích 1"), "Giải tích 1")
+        self.assertEqual(clean_course_name("Giải tích 1"), "Giải tích 1")
+
+
 class ParseTests(unittest.TestCase):
     def test_simple_name_credits_letter(self):
         rows = app.parse_computer(["Giai tich 1   3   A"])
@@ -68,6 +79,7 @@ class ParseTests(unittest.TestCase):
         self.assertTrue(all(r["diem_he_4"] != "F" or r["diem_10"] is not None for r in rows if not r["in_progress"]))
         names = " | ".join(r["ten_mon"] for r in rows)
         self.assertNotIn("trung bình", names.lower())
+        self.assertFalse(any(r["ten_mon"].startswith("Kiến thức") for r in rows))
 
 
 class SemesterOptionTests(unittest.TestCase):
@@ -88,6 +100,10 @@ class SemesterOptionTests(unittest.TestCase):
         for course in opts[0]["courses"]:
             self.assertIsNotNone(course["min_ck"])
             self.assertFalse(course["ck_over"])
+
+    def test_empty_semester_is_not_a_numbered_plan(self):
+        opts = semester_options([], target=3.6)
+        self.assertEqual(opts[0]["kind"], "empty")
 
     def test_impossible_is_a_single_option(self):
         table2 = [{"id": "m", "ten_mon": "Sử", "credits": 3, "bp": 0, "gk": 0, "ck": None, "points": None}]

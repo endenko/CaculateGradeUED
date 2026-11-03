@@ -318,15 +318,17 @@ def semester_options(table2, target, weights=(0.2, 0.3, 0.5), limit=5) -> list:
     fixed, variable = _split_semester(table2, weights)
     if not variable:
         stats = cpa(fixed)
-        reached = stats["cpa"] is not None and stats["cpa"] + 1e-9 >= target
+        if not fixed and not table2:
+            return [{"kind": "empty", "courses": [], "summary": "", "feasible": False, "gpa": None}]
         return [{
+            "kind": "idle",
             "gpa": stats["cpa"],
             "max_ck": None,
             "sum_ck": None,
-            "feasible": reached,
+            "feasible": stats["cpa"] is not None and stats["cpa"] + 1e-9 >= target,
             "courses": [],
             "summary": "Không có môn đang chờ điểm cuối kỳ",
-            "label": "Đã đạt mốc" if reached else "Chưa đủ dữ liệu hoặc chưa đạt mốc",
+            "label": "Không có môn đang chờ điểm cuối kỳ",
         }]
 
     prepared = []

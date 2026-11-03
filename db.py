@@ -13,8 +13,11 @@ Seed files
 """
 import csv
 import os
+import re
 import sqlite3
 from collections import Counter, defaultdict
+
+from utils import no_accent_vietnamese
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get('DB_PATH', '/tmp/grade.db' if os.environ.get('VERCEL') else os.path.join(BASE, 'grade.db'))
@@ -69,6 +72,41 @@ def init_db():
         conn.close()
 
 
+# Headings glued on by the CTĐT scan ("Kiến thức Nghiệp vụ sư phạm ...").
+_NAME_HEADINGS = (
+    "kiến thức thực tập và khóa luận tốt nghiệp",
+    "kiến thức thực tập và đồ án tốt nghiệp",
+    "kiến thức nghiệp vụ sư phạm",
+    "kiến thức cơ sở ngành",
+    "kiến thức chuyên ngành",
+    "kiến thức cơ sở",
+    "kiến thức đại cương",
+    "kiến thức thực tập",
+    "nghiệp vụ sư phạm",
+    "cơ sở ngành",
+    "chuyên ngành",
+)
+
+
+def clean_course_name(name: str) -> str:
+    """Drop a curriculum-block heading stuck to the front of a subject name."""
+    text = " ".join((name or "").split())
+    if not text:
+        return text
+    heads = sorted((no_accent_vietnamese(h).lower() for h in _NAME_HEADINGS), key=len, reverse=True)
+    changed = True
+    while changed and text:
+        changed = False
+        folded = no_accent_vietnamese(text).lower()
+        for head in heads:
+            if folded.startswith(head + " ") or folded == head:
+                text = text[len(head):].strip()
+                text = re.sub(r"^\d+\s+", "", text)
+                changed = True
+                break
+    return text or " ".join((name or "").split())
+
+
 def _read_csv(path):
     if not os.path.exists(path):
         return []
@@ -86,7 +124,7 @@ def seed_from_csv(csv_path=SEED_CSV, ued_csv=UED_CSV):
         n_hp = 0
         for r in _read_csv(ued_csv):
             conn.execute("INSERT OR IGNORE INTO hoc_phan (ma_hp,ten_mon,tin_chi,khoa,khoa_cu,nganh,nguon) VALUES (?,?,?,?,?,?,?)",
-                         (r['ma_hp'] or None, r['ten_mon'].strip(),
+                         (r['ma_hp'] or None, clean_course_name(r['ten_mon']),
                           int(r['tin_chi']) if r['tin_chi'] else None,
                           r['khoa'], r.get('khoa_cu', ''), r['nganh'], r['nguon']))
             n_hp += 1
@@ -97,7 +135,7 @@ def seed_from_csv(csv_path=SEED_CSV, ued_csv=UED_CSV):
             except ValueError:
                 tc = 3
             conn.execute("INSERT OR IGNORE INTO hoc_phan (ma_hp,ten_mon,tin_chi,khoa,khoa_cu,nganh,nguon) VALUES (?,?,?,?,?,?,?)",
-                         (None, r['ten_mon'].strip(), tc, 'Toán – Tin', 'Tin học', 'Danh sách gốc (repo)', 'repo gốc'))
+                         (None, clean_course_name(r['ten_mon']), tc, 'Toán – Tin', 'Tin học', 'Danh sách gốc (repo)', 'repo gốc'))
         # unique-name view used by fuzzy matching
         groups = defaultdict(list)
         for row in conn.execute("SELECT * FROM hoc_phan"):
@@ -132,8 +170,16 @@ def all_subjects():
             rows = conn.execute("SELECT ten_mon, tin_chi, ma_hp, khoa, khoa_cu FROM danh_muc_mon").fetchall()
         finally:
             conn.close()
-        _cache = [dict(ten_mon=r['ten_mon'], tin_chi=r['tin_chi'], ma_hp=r['ma_hp'], khoa=r['khoa'], khoa_cu=r['khoa_cu'],
-                       norm=normalize(r['ten_mon'])) for r in rows]
+        cleaned = []
+        seen = set()
+        for r in rows:
+            name = clean_course_name(r['ten_mon'])
+            if name in seen:
+                continue
+            seen.add(name)
+            cleaned.append(dict(ten_mon=name, tin_chi=r['tin_chi'], ma_hp=r['ma_hp'], khoa=r['khoa'], khoa_cu=r['khoa_cu'],
+                                norm=normalize(name)))
+        _cache = cleaned
     return _cache
 
 
@@ -141,7 +187,11 @@ def by_code(code):
     conn = get_db()
     try:
         r = conn.execute("SELECT ten_mon, tin_chi FROM hoc_phan WHERE ma_hp=? LIMIT 1", (code,)).fetchone()
-        return dict(r) if r else None
+        if not r:
+            return None
+        hit = dict(r)
+        hit['ten_mon'] = clean_course_name(hit['ten_mon'])
+        return hit
     finally:
         conn.close()
 

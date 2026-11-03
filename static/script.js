@@ -190,9 +190,8 @@ function confirmOCR() {
         document.querySelectorAll('.ocr-chk:checked').forEach(chk => rows.push(pendingOCR[parseInt(chk.dataset.i, 10)]));
         const target = (document.querySelector('input[name="ocrTarget"]:checked') || {}).value || '1';
         window.boardsAddOcr(target, rows, pendingTerm || null);
-        const where = String(target) === '1' ? 'Bảng 1' : 'Điểm học phần';
-        const termText = (pendingTerm && pendingTerm.nam_hoc) ? `Kỳ đã gán: Học kỳ ${pendingTerm.hoc_ky === 'he' ? 'hè' : pendingTerm.hoc_ky} · ${pendingTerm.nam_hoc}.` : 'Không xác định được kỳ/năm — chọn kỳ ở Điểm học phần.';
-        document.getElementById('ocrReview').innerHTML = `<div class="alert alert-success small mb-0">Đã thêm ${rows.length} môn vào ${where}. ${termText}</div>`;
+        const termText = (pendingTerm && pendingTerm.nam_hoc) ? `Học kỳ ${pendingTerm.hoc_ky === 'he' ? 'hè' : pendingTerm.hoc_ky} · ${pendingTerm.nam_hoc}.` : 'Không xác định được kỳ/năm.';
+        document.getElementById('ocrReview').innerHTML = `<div class="alert alert-success small mb-0">Đã đưa ${rows.length} môn vào học kỳ (${termText}). Điểm đã có cũng vào Điểm tổng. Môn chưa có điểm chỉ ở Điểm học phần.</div>`;
         return;
     }
     let count = 0;
