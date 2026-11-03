@@ -287,7 +287,18 @@ def _get_hybrid():
     if _vietocr_model is None:
         from vietocr.tool.config import Cfg
         from vietocr.tool.predictor import Predictor
-        cfg = Cfg.load_config_from_name(VIETOCR_CONFIG)
+        cfg_file = os.environ.get('VIETOCR_CONFIG_FILE', '')
+        if cfg_file and os.path.exists(cfg_file):
+            cfg = Cfg.load_config_from_file(cfg_file)  # offline (saved at build time)
+        else:
+            cfg = Cfg.load_config_from_name(VIETOCR_CONFIG)
+            if cfg_file:
+                try:
+                    cfg.save(cfg_file)
+                except OSError:
+                    pass
+        if isinstance(cfg.get('cnn'), dict) and 'pretrained' in cfg['cnn']:
+            cfg['cnn']['pretrained'] = False  # full weights are loaded below; no torchvision download
         if os.path.exists(VIETOCR_WEIGHTS):
             cfg['weights'] = VIETOCR_WEIGHTS
         cfg['device'] = os.environ.get('VIETOCR_DEVICE', 'cpu')

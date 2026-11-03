@@ -475,6 +475,10 @@ db.init_db()
 if not db.all_subjects():
     db.seed_from_csv()
 
+if os.environ.get('WARMUP', '0') == '1':
+    import threading
+    threading.Thread(target=lambda: engines._vietocr_is_available() and engines._get_hybrid(), daemon=True).start()
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
