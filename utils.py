@@ -26,3 +26,18 @@ def no_accent_vietnamese(s):
     for pattern, repl in _ACCENT_MAP:
         s = re.sub(pattern, repl, s)
     return s
+
+
+import unicodedata
+
+
+def normalize(s):
+    """Diacritic-insensitive, lowercase, punctuation-light key for fuzzy matching.
+    Unicode NFD strip (handles composed + decomposed input) and đ->d."""
+    s = unicodedata.normalize('NFD', str(s))
+    s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+    s = s.replace('đ', 'd').replace('Đ', 'D').lower()
+    s = re.sub(r'www\.\S+', ' ', s)
+    s = re.sub(r'[^\w\s\+#]', ' ', s)
+    s = s.replace('_', ' ')
+    return re.sub(r'\s+', ' ', s).strip()

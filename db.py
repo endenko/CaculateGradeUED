@@ -1,33 +1,36 @@
 # -*- coding: utf-8 -*-
 """
-Database layer — SQLite (zero-config, Docker-friendly).
+Database layer — SQLite (zero-config).
 
-Replaces the original SQL Server / pyodbc setup. The schema is identical
-to the original `OCR_Grade` database:
+Tables
+  danh_muc_mon(ten_mon PK, tin_chi, ma_hp, khoa, so_nganh)   -- one row per unique subject name
+                                                              (same schema as original + extra cols)
+  hoc_phan(ma_hp, ten_mon, tin_chi, khoa, nganh, nguon)       -- every course of every UED program
 
-    danh_muc_mon(ten_mon TEXT PRIMARY KEY, tin_chi INTEGER)
-
-Set DB_PATH (default: ./grade.db) to point at your database file.
-Seed data lives in data/danh_muc_mon.csv — extend it with your own
-subject list and run `python seed_db.py` to rebuild.
+Seed files
+  data/danh_muc_mon.csv      original IT-faculty list (ten_mon,tin_chi)
+  data/hoc_phan_ued.csv      all faculties, extracted from official UED CTĐT khóa 2025 PDFs
 """
 import csv
 import os
 import sqlite3
+from collections import Counter, defaultdict
 
-DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'grade.db'))
-SEED_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'danh_muc_mon.csv')
+BASE = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE, 'grade.db'))
+SEED_CSV = os.path.join(BASE, 'data', 'danh_muc_mon.csv')
+UED_CSV = os.path.join(BASE, 'data', 'hoc_phan_ued.csv')
+
+_cache = None  # in-memory subject list for fuzzy matching
 
 
 def _ensure_db_dir():
-    """Create the parent directory of DB_PATH if missing (e.g. /app/data in Docker)."""
     d = os.path.dirname(DB_PATH)
     if d:
         os.makedirs(d, exist_ok=True)
 
 
 def get_db():
-    """Open a connection to the SQLite database (mirrors original get_db_connection())."""
     _ensure_db_dir()
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -35,80 +38,141 @@ def get_db():
 
 
 def init_db():
-    """Create the danh_muc_mon table if it does not exist yet."""
     conn = get_db()
     try:
-        conn.execute("""
+        conn.executescript("""
             CREATE TABLE IF NOT EXISTS danh_muc_mon (
                 ten_mon  TEXT PRIMARY KEY,
                 tin_chi  INTEGER NOT NULL DEFAULT 3
-            )
+            );
+            CREATE TABLE IF NOT EXISTS hoc_phan (
+                ma_hp   TEXT,
+                ten_mon TEXT NOT NULL,
+                tin_chi INTEGER,
+                khoa    TEXT,
+                nganh   TEXT,
+                nguon   TEXT,
+                PRIMARY KEY (ma_hp, nganh, ten_mon)
+            );
+            CREATE INDEX IF NOT EXISTS ix_hp_ten ON hoc_phan(ten_mon);
         """)
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(danh_muc_mon)")}
+        for col in ('ma_hp', 'khoa', 'so_nganh'):
+            if col not in cols:
+                conn.execute(f"ALTER TABLE danh_muc_mon ADD COLUMN {col} TEXT")
         conn.commit()
     finally:
         conn.close()
 
 
-def seed_from_csv(csv_path=SEED_CSV):
-    """Load subjects from CSV (ten_mon,tin_chi) — INSERT OR REPLACE so it is idempotent."""
-    if not os.path.exists(csv_path):
-        print(f"[db] Không tìm thấy {csv_path} — bỏ qua seed.")
-        return 0
+def _read_csv(path):
+    if not os.path.exists(path):
+        return []
+    with open(path, 'r', encoding='utf-8-sig') as f:
+        return list(csv.DictReader(f))
+
+
+def seed_from_csv(csv_path=SEED_CSV, ued_csv=UED_CSV):
+    global _cache
+    init_db()
     conn = get_db()
-    count = 0
     try:
-        with open(csv_path, 'r', encoding='utf-8-sig') as f:
-            reader = csv.reader(f)
-            header = next(reader, None)  # skip header if present
-            if header and header[0].strip().lower() not in ('ten_mon', 'subject', 'ten'):
-                # no header -> rewind
-                f.seek(0)
-                reader = csv.reader(f)
-                header = None
-            for row in reader:
-                if not row or not row[0].strip():
-                    continue
-                try:
-                    credit = int(float(row[1])) if len(row) > 1 and row[1].strip() else 3
-                except ValueError:
-                    credit = 3
-                conn.execute("INSERT OR REPLACE INTO danh_muc_mon (ten_mon, tin_chi) VALUES (?, ?)",
-                             (row[0].strip(), credit))
-                count += 1
+        conn.execute("DELETE FROM hoc_phan")
+        conn.execute("DELETE FROM danh_muc_mon")
+        n_hp = 0
+        for r in _read_csv(ued_csv):
+            conn.execute("INSERT OR IGNORE INTO hoc_phan VALUES (?,?,?,?,?,?)",
+                         (r['ma_hp'] or None, r['ten_mon'].strip(),
+                          int(r['tin_chi']) if r['tin_chi'] else None,
+                          r['khoa'], r['nganh'], r['nguon']))
+            n_hp += 1
+        # original list (khoa Tin) kept as-is
+        for r in _read_csv(csv_path):
+            try:
+                tc = int(float(r.get('tin_chi') or 3))
+            except ValueError:
+                tc = 3
+            conn.execute("INSERT OR IGNORE INTO hoc_phan VALUES (?,?,?,?,?,?)",
+                         (None, r['ten_mon'].strip(), tc, 'Tin học (danh sách gốc)', '', 'repo gốc'))
+        # unique-name view used by fuzzy matching
+        groups = defaultdict(list)
+        for row in conn.execute("SELECT * FROM hoc_phan"):
+            groups[row['ten_mon']].append(row)
+        for name, rows in groups.items():
+            credits = Counter(r['tin_chi'] for r in rows if r['tin_chi'] is not None)
+            tc = credits.most_common(1)[0][0] if credits else 3
+            codes = Counter(r['ma_hp'] for r in rows if r['ma_hp'])
+            khoa = Counter(r['khoa'] for r in rows if r['khoa'])
+            conn.execute("INSERT OR REPLACE INTO danh_muc_mon (ten_mon,tin_chi,ma_hp,khoa,so_nganh) VALUES (?,?,?,?,?)",
+                         (name, tc, codes.most_common(1)[0][0] if codes else None,
+                          khoa.most_common(1)[0][0] if khoa else None,
+                          str(len({r['nganh'] for r in rows}))))
         conn.commit()
+        total = conn.execute("SELECT COUNT(*) FROM danh_muc_mon").fetchone()[0]
     finally:
         conn.close()
-    print(f"[db] Đã seed {count} môn học vào {DB_PATH}")
-    return count
+    _cache = None
+    print(f"[db] Seed: {n_hp} dòng học phần UED, {total} môn (tên duy nhất) vào {DB_PATH}")
+    return total
 
 
 def all_subjects():
-    """(ten_mon, tin_chi) for every subject — used by auto_correct_universal."""
+    """Cached list of dicts with precomputed normalized names for fuzzy matching."""
+    global _cache
+    if _cache is None:
+        from utils import normalize
+        conn = get_db()
+        try:
+            rows = conn.execute("SELECT ten_mon, tin_chi, ma_hp, khoa FROM danh_muc_mon").fetchall()
+        finally:
+            conn.close()
+        _cache = [dict(ten_mon=r['ten_mon'], tin_chi=r['tin_chi'], ma_hp=r['ma_hp'], khoa=r['khoa'],
+                       norm=normalize(r['ten_mon'])) for r in rows]
+    return _cache
+
+
+def by_code(code):
     conn = get_db()
     try:
-        cur = conn.execute("SELECT ten_mon, tin_chi FROM danh_muc_mon")
-        return cur.fetchall()
+        r = conn.execute("SELECT ten_mon, tin_chi FROM hoc_phan WHERE ma_hp=? LIMIT 1", (code,)).fetchone()
+        return dict(r) if r else None
     finally:
         conn.close()
 
 
-def search_subjects(query, limit=20):
-    """Accent-insensitive LIKE search (mirrors the original SQL Server CI/AI collation)."""
-    from utils import no_accent_vietnamese
-    q = query.strip().lower()
+def stats():
+    conn = get_db()
+    try:
+        return {
+            'subjects': conn.execute("SELECT COUNT(*) FROM danh_muc_mon").fetchone()[0],
+            'rows': conn.execute("SELECT COUNT(*) FROM hoc_phan").fetchone()[0],
+            'codes': conn.execute("SELECT COUNT(DISTINCT ma_hp) FROM hoc_phan WHERE ma_hp IS NOT NULL").fetchone()[0],
+            'faculties': [dict(khoa=r[0], nganh=r[1], so_mon=r[2]) for r in conn.execute(
+                "SELECT khoa, COUNT(DISTINCT nganh), COUNT(DISTINCT ten_mon) FROM hoc_phan GROUP BY khoa ORDER BY khoa")],
+        }
+    finally:
+        conn.close()
+
+
+def search_subjects(query, limit=20, khoa=None):
+    """Accent-insensitive substring + fuzzy search (rapidfuzz)."""
+    from utils import normalize
+    q = normalize(query)
     if not q:
         return []
-    q_norm = no_accent_vietnamese(q)
-    conn = get_db()
-    try:
-        rows = conn.execute("SELECT ten_mon, tin_chi FROM danh_muc_mon").fetchall()
-    finally:
-        conn.close()
-    out = []
-    for r in rows:
-        name = r['ten_mon']
-        if q in name.lower() or q_norm in no_accent_vietnamese(name).lower():
-            out.append({'ten_mon': name, 'tin_chi': r['tin_chi']})
-            if len(out) >= limit:
-                break
-    return out
+    subs = all_subjects()
+    if khoa:
+        subs = [s for s in subs if s['khoa'] == khoa]
+    out = [s for s in subs if q in s['norm']]
+    out.sort(key=lambda s: (not s['norm'].startswith(q), len(s['norm'])))
+    if len(out) < limit:
+        try:
+            from rapidfuzz import process, fuzz
+            seen = {s['ten_mon'] for s in out}
+            for _, score, idx in process.extract(q, [s['norm'] for s in subs], scorer=fuzz.WRatio, limit=limit * 2):
+                if score >= 86 and subs[idx]['ten_mon'] not in seen:
+                    out.append(subs[idx]); seen.add(subs[idx]['ten_mon'])
+        except ImportError:
+            pass
+    return [{'ten_mon': s['ten_mon'], 'tin_chi': s['tin_chi'], 'ma_hp': s['ma_hp'], 'khoa': s['khoa']}
+            for s in out[:limit]]

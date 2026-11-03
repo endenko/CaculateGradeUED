@@ -554,3 +554,36 @@ OCRWEBSITE/
 - Dữ liệu **KHÔNG mất** khi đóng trình duyệt
 - Dữ liệu **SẼ MẤT** nếu xóa cache/cookie trình duyệt
 - Ảnh upload được lưu tạm trong thư mục `uploads/` (an toàn để xóa thủ công)
+
+---
+
+## 🆕 Cập nhật 11/2026 — VietOCR + CSDL toàn trường + giao diện UED
+
+### OCR (miễn phí 100%, offline)
+* **Mặc định (`OCR_HANDWRITING_ENGINE=vietocr`)**: PaddleOCR `PP-OCRv6_medium_det` (phát hiện dòng chữ) + **VietOCR `vgg_transformer`** ([pbcquoc/vietocr](https://github.com/pbcquoc/vietocr), Apache-2.0) để nhận dạng tiếng Việt có dấu. VietOCR phục hồi dấu tốt hơn hẳn PaddleOCR `lang='vi'` (VD: `Tu tung H Chí Minh` → `Tư tưởng Hồ Chí Minh`).
+* Chế độ "Ảnh Portal": dùng Tesseract nếu máy có, **nếu không có thì tự chuyển sang Paddle-det + VietOCR**.
+* Engine `paddle`, `tesseract`, `google` vẫn chọn được qua biến môi trường.
+
+Cài đặt (CPU):
+```bash
+python -m venv .venv && . .venv/bin/activate
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+pip install -r requirements.txt
+pip install --no-deps vietocr==0.3.13      # vietocr pin deps cũ -> cài no-deps
+python seed_db.py
+gunicorn --bind 0.0.0.0:5000 --workers 1 --threads 4 --timeout 300 app:app
+```
+
+### CSDL môn học toàn trường
+* `data/hoc_phan_ued.csv`: **2.141 dòng (mã HP × ngành), 1.360 mã học phần, ~1.230 tên môn duy nhất, 35 ngành, 8 khoa** — trích từ CTĐT khóa 2025 chính thức: <https://ued.udn.vn/2025/11/09/chuong-trinh-dao-tao-ke-hoach-dao-tao-ap-dung-cho-khoa-ts-2025/> (link PDF từng ngành ở `tools/ued_ctdt_2025_urls.txt`, cột `nguon`).
+* Các PDF là **bản scan** nên dữ liệu được OCR (`tools/ocr_pages.py`) rồi dựng lại bảng theo mã HP 8 chữ số (`tools/build_ued_courses.py`), tên môn chọn theo "bỏ phiếu" giữa các lần xuất hiện. ⚠️ Một số ít tên có thể còn lỗi OCR nhỏ; dòng không đọc được tín chỉ được đánh dấu `[tín chỉ: không đọc được]`.
+* Danh sách gốc khoa Tin (`data/danh_muc_mon.csv`) vẫn giữ nguyên.
+
+### Fuzzy matching
+`rapidfuzz` + chuẩn hoá bỏ dấu Unicode (NFD, đ→d) + mở rộng viết tắt (VN, HCM, ML, PPDH, GDTC…) + phạt lệch số thứ tự ("Giải tích 1" ≠ "2") + ưu tiên môn có số tín chỉ khớp; nếu dòng có **mã HP 8 số** thì tra thẳng mã (100%).
+
+### API mới
+`GET /api/stats`, `GET /api/faculties`, `GET /api/match?q=...`, `GET /api/search_subject?q=...&khoa=...`; `/health` trả trạng thái các engine OCR.
+
+### Kiểm thử
+`python tests/make_synthetic.py && python tests/eval_ocr.py` — ảnh viết tay giả lập (font Patrick Hand, xoay + nhiễu).

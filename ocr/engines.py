@@ -35,7 +35,8 @@ if TESSERACT_CMD:
 else:
     import pytesseract  # let pytesseract find tesseract on PATH (Docker: /usr/bin/tesseract)
 
-OCR_HANDWRITING_ENGINE = os.environ.get("OCR_HANDWRITING_ENGINE", "paddle").strip().lower()
+OCR_HANDWRITING_ENGINE = os.environ.get("OCR_HANDWRITING_ENGINE", "vietocr").strip().lower()
+OCR_COMPUTER_ENGINE = os.environ.get("OCR_COMPUTER_ENGINE", "auto").strip().lower()
 
 # ---------------------------------------------------------------------------
 # Shared image preprocessing (from original LocalOCR.py)
@@ -74,7 +75,13 @@ def tesseract_words(image_path):
 
 
 def tesseract_full_text(image_path):
-    """Plain text OCR (vie+eng) — used by /api/scan_detail_score (Điểm Bộ Phận / Giữa Kỳ)."""
+    """Plain text OCR (vie+eng) — used by /api/scan_detail_score (Điểm Bộ Phận / Giữa Kỳ).
+    Falls back to the VietOCR hybrid (line-joined) when Tesseract is not installed."""
+    import shutil
+    if not (TESSERACT_CMD or shutil.which('tesseract')):
+        words = hybrid_words(image_path)
+        words.sort(key=lambda w: (round(w['y'] / 20), w['x']))
+        return "\n".join(w['text'] for w in words)
     processed_img = preprocess_image(image_path)
     config = '--oem 3 --psm 6'
     return pytesseract.image_to_string(processed_img, lang='vie+eng', config=config)
@@ -250,6 +257,114 @@ def vietocr_words(image_path):
 
 
 # ===========================================================================
+# 2b) HYBRID: PaddleOCR text DETECTION + VietOCR (pbcquoc/vietocr) RECOGNITION
+#     VietOCR's vgg_transformer is trained on Vietnamese printed + handwritten
+#     text and restores diacritics far better than PaddleOCR lang='vi'
+#     (e.g. "Tu tung H Chí Minh" -> "Tư tưởng Hồ Chí Minh"). 100% free/offline.
+# ===========================================================================
+_hybrid_lock = threading.Lock()
+_det_model = None
+_vietocr_model = None
+VIETOCR_CONFIG = os.environ.get('VIETOCR_CONFIG', 'vgg_transformer')
+VIETOCR_WEIGHTS = os.environ.get('VIETOCR_WEIGHTS', os.path.expanduser('~/.cache/vietocr/vgg_transformer.pth'))
+
+
+def _vietocr_is_available():
+    try:
+        import vietocr  # noqa: F401
+        import torch  # noqa: F401
+        return _paddle_is_available()
+    except Exception:
+        return False
+
+
+def _get_hybrid():
+    global _det_model, _vietocr_model
+    if _det_model is None:
+        from paddleocr import TextDetection
+        det_name = os.environ.get('OCR_DET_MODEL', 'PP-OCRv6_medium_det')
+        _det_model = TextDetection(model_name=det_name, engine_config={'run_mode': PADDLE_RUN_MODE})
+    if _vietocr_model is None:
+        from vietocr.tool.config import Cfg
+        from vietocr.tool.predictor import Predictor
+        cfg = Cfg.load_config_from_name(VIETOCR_CONFIG)
+        if os.path.exists(VIETOCR_WEIGHTS):
+            cfg['weights'] = VIETOCR_WEIGHTS
+        cfg['device'] = os.environ.get('VIETOCR_DEVICE', 'cpu')
+        cfg['predictor']['beamsearch'] = False
+        _vietocr_model = Predictor(cfg)
+    return _det_model, _vietocr_model
+
+
+def _hybrid_once(path, limit_side_len=None):
+    from PIL import Image
+    det, rec = _get_hybrid()
+    kw = {'limit_side_len': limit_side_len} if limit_side_len else {}
+    res = list(det.predict(path, **kw))
+    polys = res[0]['dt_polys'] if res else []
+    im = Image.open(path).convert('RGB')
+    W, H = im.size
+    boxes, crops = [], []
+    rects = []
+    for q in polys:
+        pts = np.asarray(q, dtype=np.float64)
+        rects.append((pts[:, 0].min(), pts[:, 1].min(), pts[:, 0].max(), pts[:, 1].max()))
+    med_h = float(np.median([r[3] - r[1] for r in rects])) if rects else 0
+    for x1, y1, x2, y2 in rects:
+        if x2 - x1 < 3 or y2 - y1 < 3:
+            continue
+        # skip stamps / signatures / page-size blobs: they make the seq2seq
+        # decoder run for minutes and never contain grade text
+        if (y2 - y1) > max(4 * med_h, 0.25 * H) or (x2 - x1) > 0.95 * W:
+            continue
+        pad = max(2, int((y2 - y1) * 0.12))
+        crops.append(im.crop((max(0, x1 - pad), max(0, y1 - pad), min(W, x2 + pad), min(H, y2 + pad))))
+        boxes.append(((x1 + x2) / 2, (y1 + y2) / 2))
+    texts = rec.predict_batch(crops) if crops else []
+    return [{'text': t.strip(), 'x': float(b[0]), 'y': float(b[1])}
+            for t, b in zip(texts, boxes) if t and t.strip()]
+
+
+def hybrid_words(image_path):
+    """Paddle det + VietOCR rec, with the same upscale / second-pass tricks."""
+    tmp_path = None
+    try:
+        path = _prepare_image(image_path)
+        if path != image_path:
+            tmp_path = path
+        with _hybrid_lock:
+            words = _hybrid_once(path)
+            if _needs_second_pass(words):
+                try:
+                    words2 = _hybrid_once(path, limit_side_len=1920)
+                    words = _merge_word_lists(words, words2)
+                except Exception as e:
+                    print(f"[OCR] hybrid second pass failed: {e}")
+        return words
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+
+
+def _tesseract_is_available():
+    import shutil
+    return bool(TESSERACT_CMD or shutil.which('tesseract'))
+
+
+def engine_status():
+    return {
+        'handwriting_engine': OCR_HANDWRITING_ENGINE,
+        'vietocr': _vietocr_is_available(),
+        'paddleocr': _paddle_is_available(),
+        'tesseract': _tesseract_is_available(),
+        'google_vision': _google_is_available(),
+    }
+
+
+# ===========================================================================
 # 3) GOOGLE CLOUD VISION (OPTIONAL — only when explicitly enabled)
 # ===========================================================================
 def _google_is_available():
@@ -278,8 +393,13 @@ def google_words(image_path):
 # Dispatch helpers used by app.py
 # ===========================================================================
 def computer_words(image_path):
-    """Computer-screenshot mode: Tesseract (original behavior, kept)."""
-    return tesseract_words(image_path)
+    """Computer-screenshot mode: Tesseract if installed (original behavior),
+    otherwise the free PaddleOCR-det + VietOCR hybrid."""
+    if OCR_COMPUTER_ENGINE in ('auto', 'tesseract') and _tesseract_is_available():
+        return tesseract_words(image_path)
+    if _vietocr_is_available():
+        return hybrid_words(image_path)
+    return vietocr_words(image_path)
 
 
 def handwriting_words(image_path):
@@ -295,6 +415,15 @@ def handwriting_words(image_path):
         except Exception as e:
             print(f"[OCR] Google Vision failed ({e}) -> falling back")
             engine = 'paddle'
+
+    if engine == 'vietocr' and _vietocr_is_available():
+        try:
+            return hybrid_words(image_path), 'paddle-det+vietocr'
+        except Exception as e:
+            print(f"[OCR] VietOCR hybrid failed ({e}) -> falling back to PaddleOCR")
+            engine = 'paddle'
+    elif engine == 'vietocr':
+        engine = 'paddle'
 
     if engine == 'paddle' and _paddle_is_available():
         try:
@@ -313,6 +442,9 @@ def warmup():
         try:
             _get_paddle_ocr()
             print("[warmup] PaddleOCR Vietnamese models ready")
+            if _vietocr_is_available():
+                _get_hybrid()
+                print("[warmup] VietOCR hybrid ready")
         except Exception as e:
             print(f"[warmup] PaddleOCR unavailable: {e}")
     print("[warmup] done")

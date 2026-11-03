@@ -14,14 +14,14 @@ Original parsing logic (regex, fuzzy matching, grade conversion) is unchanged.
 """
 import os
 import re
-from difflib import SequenceMatcher
+from rapidfuzz import fuzz, process
 
 from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
 
 import db
 from ocr import engines
-from utils import no_accent_vietnamese
+from utils import no_accent_vietnamese, normalize
 
 app = Flask(__name__)
 
@@ -57,7 +57,49 @@ def _x_separated(group, word, min_gap=150):
     return False
 
 
+def reconstruct_lines_anchor(word_list):
+    """Handwriting rows: anchor each row on its left-most text (subject name) and
+    attach every other token (credits / grade columns) to the anchor with the
+    nearest skew-corrected Y. Robust to tilted photos where the right columns
+    drift up/down relative to the names."""
+    if not word_list:
+        return []
+    xs = sorted(w['x'] for w in word_list)
+    x_min, x_max = xs[0], xs[-1]
+    split = x_min + 0.35 * (x_max - x_min)
+    anchors = sorted([w for w in word_list if w['x'] <= split and re.search(r'[^\W\d_]{2,}', w['text'])],
+                     key=lambda w: w['y'])
+    if len(anchors) < 2:
+        return None
+    # estimate skew: median slope between each right token and its naive-nearest anchor
+    import statistics
+    slopes = []
+    for w in word_list:
+        if w['x'] > split:
+            a = min(anchors, key=lambda a: abs(a['y'] - w['y']))
+            if w['x'] - a['x'] > 50:
+                slopes.append((w['y'] - a['y']) / (w['x'] - a['x']))
+    slope = statistics.median(slopes) if slopes else 0.0
+    if abs(slope) > 0.15:
+        slope = 0.0
+    rows = {id(a): [a] for a in anchors}
+    for w in word_list:
+        if any(w is a for a in anchors):
+            continue
+        a = min(anchors, key=lambda a: abs(w['y'] - (a['y'] + slope * (w['x'] - a['x']))))
+        rows[id(a)].append(w)
+    lines = []
+    for a in anchors:
+        row = sorted(rows[id(a)], key=lambda k: k['x'])
+        lines.append(" ".join(item['text'] for item in row))
+    return lines
+
+
 def reconstruct_lines(word_list, mode):
+    if mode == 'handwriting':
+        anchored = reconstruct_lines_anchor(list(word_list))
+        if anchored:
+            return anchored
     """Group words into lines by Y. Handwriting OCR boxes within one row can be
     vertically offset (subject column vs grade column), so side-by-side groups
     (clearly separated X positions) within a moderate Y gap are merged back."""
@@ -113,44 +155,63 @@ def quy_doi_chuan(diem_so):
         return 'F'
 
 
-def auto_correct_universal(raw_name, mode):
-    """Fuzzy-match the OCR'd subject name against danh_muc_mon (SQLite now)."""
+_ABBR = {
+    'vn': 'viet nam', 'hcm': 'ho chi minh', 'ml': 'mac lenin', 'cnxh': 'chu nghia xa hoi',
+    'gd': 'giao duc', 'gdtc': 'giao duc the chat', 'gdqp': 'giao duc quoc phong', 'pp': 'phuong phap',
+    'ppdh': 'phuong phap day hoc', 'nckh': 'nghien cuu khoa hoc', 'csdl': 'co so du lieu',
+    'ctdl': 'cau truc du lieu', 'cntt': 'cong nghe thong tin', 'th': 'tieu hoc', 'mn': 'mam non',
+    'tv': 'tieng viet', 'ta': 'tieng anh', 'dc': 'dai cuong', 'ktdg': 'kiem tra danh gia',
+}
+
+
+def expand_abbr(q):
+    return ' '.join(_ABBR.get(t, t) for t in q.split())
+
+
+def auto_correct_universal(raw_name, mode, code=None, credit=None):
+    """Fuzzy-match an OCR'd subject name against the all-faculty UED database.
+
+    1. 8-digit UED course code found in the line -> exact lookup (100%).
+    2. Diacritic-insensitive normalisation (utils.normalize).
+    3. rapidfuzz: combined score = max(token_set_ratio, WRatio, ratio) with a
+       length-penalty so short noise does not match long names.
+    Returns (ten_mon, "NN%", tin_chi).
+    """
     try:
-        db_subjects = db.all_subjects()
-        best_match = raw_name
-        highest_ratio = 0.0
-        best_credit = 3
-
-        raw_lower = raw_name.lower()
-        if 'c++' in raw_lower or 'cet' in raw_lower or 'ctt' in raw_lower or 'c t' in raw_lower:
-            return "Lập trình C++", "100%", 3
-
-        raw_no_accent = no_accent_vietnamese(raw_name).lower()
-        clean_raw = re.sub(r'www\.\S+', '', raw_no_accent)
-        clean_raw = re.sub(r'[^\w\s\+#]', '', clean_raw).strip()
-
-        for row in db_subjects:
-            subject = row['ten_mon']
-            db_credit = row['tin_chi']
-
-            sub_no_accent = no_accent_vietnamese(subject).lower()
-            clean_sub = re.sub(r'[^\w\s\+#]', '', sub_no_accent)
-
-            ratio = SequenceMatcher(None, clean_raw, clean_sub).ratio()
-            if ratio > highest_ratio:
-                highest_ratio = ratio
-                best_match = subject
-                best_credit = db_credit
-
-        similarity_string = f"{int(highest_ratio * 100)}%"
-
-        threshold = 0.60 if mode == 'computer' else 0.20
-        if highest_ratio >= threshold:
-            return best_match, similarity_string, best_credit
-        else:
-            return raw_name, similarity_string, best_credit
+        if code:
+            hit = db.by_code(code)
+            if hit:
+                return hit['ten_mon'], "100%", hit['tin_chi']
+        q = expand_abbr(normalize(raw_name))
+        q = re.sub(r'^\d+\s+', '', q)
+        subjects = db.all_subjects()
+        if not q or not subjects:
+            return raw_name, "0%", 3
+        choices = [s['norm'] for s in subjects]
+        idxs = []
+        for scorer in (fuzz.WRatio, fuzz.ratio, fuzz.token_sort_ratio):
+            idxs += [i for _, _, i in process.extract(q, choices, scorer=scorer, limit=15)]
+        best, best_score = None, -1.0
+        for idx in dict.fromkeys(idxs):
+            n = choices[idx]
+            sc = 0.6 * fuzz.ratio(q, n) + 0.4 * max(fuzz.partial_ratio(q, n), fuzz.token_set_ratio(q, n))
+            # exact numeric suffix matters ("Giải tích 1" vs "Giải tích 2")
+            dq, dn = re.findall(r'\d+', q), re.findall(r'\d+', n)
+            if dq and dn and dq[-1] != dn[-1]:
+                sc -= 15
+            elif bool(dq) != bool(dn):
+                sc -= 6
+            if credit is not None and subjects[idx]['tin_chi'] == credit:
+                sc += 4  # OCR'd credit agrees with the DB -> tie-breaker
+            if sc > best_score:
+                best, best_score = subjects[idx], sc
+        pct = f"{int(round(min(max(best_score, 0), 100)))}%"
+        threshold = 75 if mode == 'computer' else 65
+        if best_score >= threshold:
+            return best['ten_mon'], pct, best['tin_chi']
+        return raw_name, pct, best['tin_chi'] if best_score >= 45 else 3
     except Exception as e:
-        print("Lỗi SQL:", e)
+        print("Lỗi matching:", e)
         return raw_name, "0%", 3
 
 
@@ -208,7 +269,9 @@ def parse_computer(lines):
             else:
                 diem_chu = diem_chu_ocr
 
-            ten_mon_chuan, similarity_pct, db_credit = auto_correct_universal(raw_name, 'computer')
+            code_m = re.search(r'\b(\d{8})\b', line)
+            ten_mon_chuan, similarity_pct, db_credit = auto_correct_universal(
+                raw_name, 'computer', code_m.group(1) if code_m else None)
             if len(ten_mon_chuan) < 2:
                 continue
 
@@ -225,41 +288,80 @@ def parse_computer(lines):
 # ========================================================
 # ✍️ PARSER VIẾT TAY (CHỐNG LƯỜI V38)
 # ========================================================
+def _split_handwriting_line(line):
+    """Token-based split: <name> [credit] <score10> [letter...].
+    The score is the LAST decimal token (7.5 / 7,5); if the decimal point was
+    lost by OCR ("95"), a 2-digit 11..99 token is read as 9.5. Names may end
+    in digits ("Giải tích 1", "Tiếng Anh B1.1") so we anchor from the score."""
+    toks = line.split()
+    score_i = None
+    for i in range(len(toks) - 1, 0, -1):
+        if re.fullmatch(r"\d{1,2}[\.,]\d{1,2}", toks[i]) and float(toks[i].replace(',', '.')) <= 10:
+            score_i = i
+            break
+    fixed = None
+    if score_i is None:
+        for i in range(len(toks) - 1, 0, -1):
+            t = toks[i]
+            if re.fullmatch(r"\d{2}", t) and 11 <= int(t) <= 99:
+                score_i, fixed = i, f"{t[0]}.{t[1]}"
+                break
+            if re.fullmatch(r"\d{1,2}", t) and int(t) <= 10 and i >= 2:
+                score_i = i
+                break
+    if score_i is None:
+        return None
+    credit = None
+    name_end = score_i
+    if score_i >= 2 and re.fullmatch(r"[1-9]", toks[score_i - 1]):
+        credit = toks[score_i - 1]
+        name_end = score_i - 1
+    name = " ".join(toks[:name_end]).strip()
+    if not re.search(r"[^\W\d_]{2,}", name):
+        return None
+    return name, credit, fixed or toks[score_i], " ".join(toks[score_i + 1:])
+
+
 def parse_handwriting(lines):
     results = []
-    pattern = re.compile(r"(.+?)\s+(?:(\d)\s+)?(\d{1,2}(?:[\.,]\d+)?)(.*)")
 
     for line in lines:
         line = line.strip()
-        match = pattern.search(line)
-        if match:
-            raw_name_ocr = match.group(1).strip()
-            tin_chi_ocr = match.group(2)
-            diem_10_str = match.group(3)
-            phan_duoi = match.group(4) or ""
+        parts = _split_handwriting_line(line)
+        if parts:
+            raw_name_ocr, tin_chi_ocr, diem_10_str, phan_duoi = parts
 
             diem_chu_ocr = None
-            match_chu = re.search(r"([A-DF])\s*([\+\-tTyY\*\d]?)", phan_duoi, re.IGNORECASE)
+            match_chu = re.search(r"([A-DF])\s*([\+\-tTyY\*%\d]?)", phan_duoi, re.IGNORECASE)
             if match_chu:
                 chu_cai = match_chu.group(1).upper()
                 dau_kem_theo = match_chu.group(2).upper()
                 # 't/y/*' AND digits are almost always a misread '+' in handwriting (e.g. C4 = C+)
-                if dau_kem_theo in ['T', 'Y', '*'] or dau_kem_theo.isdigit():
+                if dau_kem_theo in ['T', 'Y', '*', '%'] or dau_kem_theo.isdigit():
                     dau_kem_theo = '+'
                 diem_chu_ocr = chu_cai + dau_kem_theo
 
-            ten_mon_chuan, similarity_pct, db_credit = auto_correct_universal(raw_name_ocr, 'handwriting')
+            ten_mon_chuan, similarity_pct, db_credit = auto_correct_universal(
+                raw_name_ocr, 'handwriting', credit=int(tin_chi_ocr) if tin_chi_ocr else None)
 
             final_tin_chi = int(tin_chi_ocr) if tin_chi_ocr is not None else db_credit
 
-            if diem_chu_ocr:
+            try:
+                diem_10 = float(diem_10_str.replace(',', '.'))
+            except Exception:
+                diem_10 = -1.0
+            decimal_seen = bool(re.search(r'[\.,]', diem_10_str or '')) and diem_10_str in line
+            if diem_chu_ocr and not decimal_seen:
+                # decimal point was lost/reconstructed -> the written letter is more reliable
+                final_diem_he_4 = diem_chu_ocr
+            elif 0.0 <= diem_10 <= 10.0 and decimal_seen:
+                # the 10-point score is the source of truth; handwritten letters
+                # (B+ vs B4 vs B%) are the most error-prone part of OCR
+                final_diem_he_4 = quy_doi_chuan(diem_10)
+            elif diem_chu_ocr:
                 final_diem_he_4 = diem_chu_ocr
             else:
-                try:
-                    diem_10 = float(diem_10_str.replace(',', '.'))
-                except Exception:
-                    diem_10 = 0.0
-                final_diem_he_4 = quy_doi_chuan(diem_10)
+                final_diem_he_4 = quy_doi_chuan(max(diem_10, 0.0))
 
             if len(ten_mon_chuan) < 2:
                 continue
@@ -284,7 +386,26 @@ def home():
 
 @app.route('/health')
 def health():
-    return jsonify({"success": True, "status": "ok"})
+    return jsonify({"success": True, "status": "ok", "ocr": engines.engine_status()})
+
+
+@app.route('/api/stats')
+def api_stats():
+    return jsonify(db.stats())
+
+
+@app.route('/api/faculties')
+def api_faculties():
+    return jsonify([f['khoa'] for f in db.stats()['faculties']])
+
+
+@app.route('/api/match', methods=['GET'])
+def api_match():
+    """Debug/demo: fuzzy-match a free-text subject name."""
+    q = request.args.get('q', '')
+    mode = request.args.get('mode', 'handwriting')
+    name, pct, tc = auto_correct_universal(q, mode)
+    return jsonify({"query": q, "ten_mon": name, "percentage": pct, "tin_chi": tc})
 
 
 @app.route('/api/search_subject', methods=['GET'])
@@ -292,7 +413,7 @@ def search_subject():
     query = request.args.get('q', '')
     if not query:
         return jsonify([])
-    return jsonify(db.search_subjects(query))
+    return jsonify(db.search_subjects(query, khoa=request.args.get('khoa') or None))
 
 
 @app.route('/api/process_ocr', methods=['POST'])
@@ -315,7 +436,7 @@ def process_ocr():
                 word_list = engines.computer_words(path)
                 lines = reconstruct_lines(word_list, mode)
                 extracted_data = parse_computer(lines)
-                engine = 'tesseract'
+                engine = 'tesseract' if engines._tesseract_is_available() else 'paddle-det+vietocr'
 
             return jsonify({"success": True, "data": extracted_data, "engine": engine})
         except Exception as e:
@@ -350,7 +471,10 @@ def scan_detail_score():
     return jsonify({"success": False, "error": "File không hợp lệ"})
 
 
+db.init_db()
+if not db.all_subjects():
+    db.seed_from_csv()
+
 if __name__ == '__main__':
-    db.init_db()
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)

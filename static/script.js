@@ -14,7 +14,7 @@ function searchSubject() {
 
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
-        fetch(`/api/search_subject?q=${encodeURIComponent(query)}`)
+        fetch(`/api/search_subject?q=${encodeURIComponent(query)}&khoa=${encodeURIComponent(document.getElementById('khoaFilter').value)}`)
             .then(res => res.json())
             .then(data => {
                 const box = document.getElementById('suggestions');
@@ -24,7 +24,7 @@ function searchSubject() {
                     data.forEach(item => {
                         const div = document.createElement('div');
                         div.className = 'suggestion-item small';
-                        div.innerHTML = `<b>${item.ten_mon}</b> <span class="text-muted float-end">(${item.tin_chi} tín)</span>`;
+                        div.innerHTML = `<b>${item.ten_mon}</b> <span class="text-muted float-end">(${item.tin_chi} TC)</span><div class="meta">${item.ma_hp || ''} ${item.khoa ? '· ' + item.khoa : ''}</div>`;
                         div.onclick = () => {
                             document.getElementById('inputName').value = item.ten_mon;
                             document.getElementById('inputCredits').value = item.tin_chi;
@@ -86,40 +86,78 @@ function addManualSubject() {
     }
 }
 
+let pendingOCR = [];
+function escapeHtml(t) { return String(t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
 function uploadOCR() {
     const fileInput = document.getElementById('ocrFile');
     if (fileInput.files.length === 0) return alert("Vui lòng chọn ảnh trước bạn nhé!");
-
     const mode = document.querySelector('input[name="ocrMode"]:checked').value;
     const formData = new FormData();
     formData.append('file_anh', fileInput.files[0]);
     formData.append('mode', mode);
-
     document.getElementById('ocrLoading').style.display = 'inline-block';
-
     fetch('/api/process_ocr', { method: 'POST', body: formData })
         .then(res => res.json())
         .then(resp => {
             document.getElementById('ocrLoading').style.display = 'none';
-            if (resp.success) {
-                let count = 0;
-                resp.data.forEach(newSub => {
-                    if (!transcriptData.some(s => s.ten_mon === newSub.ten_mon)) {
-                        transcriptData.push({ ...newSub, sim_grade: null });
-                        count++;
-                    }
-                });
-                saveData();
-                alert(`Đã thêm thành công ${count} môn! (Chế độ: ${mode === 'computer' ? 'Máy tính' : 'Viết tay'})`);
-            } else {
-                alert("Lỗi OCR: " + resp.error);
-            }
+            if (!resp.success) return alert("Lỗi OCR: " + resp.error);
+            pendingOCR = resp.data;
+            renderOCRReview(resp.engine);
         })
-        .catch(err => {
+        .catch(() => {
             document.getElementById('ocrLoading').style.display = 'none';
             alert("Lỗi kết nối server!");
         });
 }
+
+function renderOCRReview(engine) {
+    const box = document.getElementById('ocrReview');
+    box.style.display = 'block';
+    if (!pendingOCR.length) { box.innerHTML = `<div class="alert alert-warning small mb-0">Không đọc được môn nào (engine: ${engine}). Thử ảnh rõ hơn / đúng chế độ.</div>`; return; }
+    let rows = pendingOCR.map((m, i) => {
+        const pct = parseInt(m.percentage) || 0;
+        return `<tr class="${pct < 70 ? 'ocr-row-low' : ''}">
+            <td><input type="checkbox" class="form-check-input ocr-chk" data-i="${i}" ${pct >= 55 ? 'checked' : ''}></td>
+            <td><div class="fw-semibold">${escapeHtml(m.ten_mon)}</div><div class="small text-muted">OCR: ${escapeHtml(m.raw_name)}</div></td>
+            <td class="text-center">${m.tin_chi}</td><td class="text-center"><b>${m.diem_he_4}</b></td>
+            <td class="text-center"><span class="badge ${pct >= 80 ? 'bg-success' : pct >= 60 ? 'badge-gold' : 'bg-danger'}">${m.percentage}</span></td></tr>`;
+    }).join('');
+    box.innerHTML = `<div class="small text-muted mb-2">Engine: <b>${engine}</b> · Kiểm tra lại trước khi thêm (độ khớp &lt; 55% sẽ bỏ chọn).</div>
+        <div class="table-responsive"><table class="table table-sm align-middle ued-table"><thead><tr><th></th><th>Môn (khớp DB)</th><th class="text-center">TC</th><th class="text-center">Điểm</th><th class="text-center">Khớp</th></tr></thead><tbody>${rows}</tbody></table></div>
+        <button class="btn btn-ued w-100" onclick="confirmOCR()"><i class="fas fa-check"></i> Thêm các môn đã chọn</button>`;
+}
+
+function confirmOCR() {
+    let count = 0;
+    document.querySelectorAll('.ocr-chk:checked').forEach(chk => {
+        const m = pendingOCR[parseInt(chk.dataset.i)];
+        if (!transcriptData.some(s => s.ten_mon === m.ten_mon)) { transcriptData.push({ ...m, sim_grade: null }); count++; }
+    });
+    saveData();
+    document.getElementById('ocrReview').innerHTML = `<div class="alert alert-success small mb-0">Đã thêm ${count} môn vào bảng điểm.</div>`;
+}
+
+function showPreview(file) {
+    if (!file) return;
+    const img = document.getElementById('ocrPreview');
+    img.src = URL.createObjectURL(file); img.style.display = 'block';
+    document.getElementById('dropHint').style.display = 'none';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const fi = document.getElementById('ocrFile'), dz = document.getElementById('dropzone');
+    fi.addEventListener('change', () => showPreview(fi.files[0]));
+    ['dragenter', 'dragover'].forEach(e => dz.addEventListener(e, ev => { ev.preventDefault(); dz.classList.add('drag'); }));
+    ['dragleave', 'drop'].forEach(e => dz.addEventListener(e, ev => { ev.preventDefault(); dz.classList.remove('drag'); }));
+    dz.addEventListener('drop', ev => { if (ev.dataTransfer.files.length) { fi.files = ev.dataTransfer.files; showPreview(fi.files[0]); } });
+    fetch('/api/stats').then(r => r.json()).then(st => {
+        document.getElementById('statSubjects').innerText = st.subjects;
+        document.getElementById('statFaculties').innerText = st.faculties.length;
+        const sel = document.getElementById('khoaFilter');
+        st.faculties.forEach(f => { const o = document.createElement('option'); o.value = f.khoa; o.textContent = `${f.khoa} (${f.so_mon})`; sel.appendChild(o); });
+    }).catch(() => {});
+});
 
 function renderTable() {
     const tbody = document.getElementById('transcriptTable');
@@ -218,8 +256,8 @@ function calculateStats() {
     const diffEl = document.getElementById('diffGPA');
     diffEl.innerText = (diff > 0 ? "+" : "") + diff;
 
-    if (diff > 0) diffEl.parentElement.className = 'card score-box bg-success text-white';
-    else if (diff < 0) diffEl.parentElement.className = 'card score-box bg-danger text-white';
+    if (diff > 0) diffEl.parentElement.className = 'card score-box up';
+    else if (diff < 0) diffEl.parentElement.className = 'card score-box down';
     else diffEl.parentElement.className = 'card score-box diff';
 
     const target = parseInt(document.getElementById('targetCredits').value);

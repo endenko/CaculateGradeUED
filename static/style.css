@@ -1,174 +1,66 @@
-:root {
-    --primary: #d63384;
-    --bg-soft: #fff0f6;
+/* UED palette — xanh dương (logo) + vàng kim */
+:root{
+  --ued-blue:#0b4ea2; --ued-blue-dark:#062f66; --ued-blue-soft:#e8f0fb;
+  --ued-gold:#f5b800; --ued-gold-dark:#c99400; --ued-gold-soft:#fff6d6;
+  --primary:var(--ued-blue); --text:#1d2a3a; --radius:16px;
 }
-
-body {
-    background: #f8f9fa;
-    font-family: 'Segoe UI', sans-serif;
-    min-height: 100vh;
-    padding-bottom: 2rem;
-}
-
-.card {
-    border: none;
-    border-radius: 16px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-    transition: 0.3s;
-}
-
-.card:hover {
-    transform: translateY(-2px);
-}
-
-.card-input-section {
-    position: relative;
-    z-index: 1050;
-}
-
-.btn-kanna {
-    background: var(--primary);
-    color: white;
-    border-radius: 12px;
-    font-weight: 600;
-    border: none;
-}
-
-.btn-kanna:hover {
-    background: #b02a6b;
-    color: white;
-}
-
-.suggestions-box {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    z-index: 9999;
-    background: white;
-    width: 100%;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    max-height: 250px;
-    overflow-y: auto;
-    display: none;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-    margin-top: 4px;
-}
-
-.suggestion-item {
-    padding: 10px 15px;
-    cursor: pointer;
-    border-bottom: 1px solid #f0f0f0;
-    transition: background 0.2s;
-}
-
-.suggestion-item:last-child {
-    border-bottom: none;
-}
-
-.suggestion-item:hover {
-    background: #f8f9fa;
-    color: var(--primary);
-}
-
-.score-box {
-    text-align: center;
-    padding: 15px;
-    border-radius: 12px;
-    position: relative;
-    overflow: hidden;
-}
-
-.score-box.old {
-    background: #ffe3e3;
-    color: #dc3545;
-}
-
-.score-box.new {
-    background: #d1e7dd;
-    color: #198754;
-    border: 2px solid #198754;
-}
-
-.score-box.diff {
-    background: #fff3cd;
-    color: #ffc107;
-}
-
-.score-value {
-    font-size: 2.5rem;
-    font-weight: 800;
-    line-height: 1.2;
-}
-
-.score-label {
-    font-size: 0.9rem;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    opacity: 0.8;
-}
-
-.badge-grade {
-    width: 35px;
-    height: 35px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    font-weight: bold;
-}
-
-.bg-A-plus {
-    background: #198754;
-    color: white;
-    box-shadow: 0 0 8px #198754;
-}
-
-.bg-A {
-    background: #d1e7dd;
-    color: #0f5132;
-}
-
-.bg-B {
-    background: #cfe2ff;
-    color: #084298;
-}
-
-.bg-C {
-    background: #fff3cd;
-    color: #664d03;
-}
-
-.bg-D {
-    background: #f8d7da;
-    color: #842029;
-}
-
-.bg-F {
-    background: #212529;
-    color: white;
-}
-
-.progress {
-    height: 25px;
-    border-radius: 15px;
-    background-color: #e9ecef;
-}
-
-.progress-bar {
-    font-weight: bold;
-    line-height: 25px;
-    background: linear-gradient(45deg, #d63384, #fd7e14);
-}
-
-.suggestion-alert {
-    cursor: pointer;
-    transition: 0.2s;
-    border-left: 4px solid #ffc107;
-    background: #fffdf5;
-}
-
-.suggestion-alert:hover {
-    transform: translateX(5px);
-    background: #fff8db;
-}
+body{font-family:'Be Vietnam Pro',system-ui,sans-serif;background:linear-gradient(180deg,#f3f7fd 0,#fdfbf3 100%);color:var(--text);min-height:100vh}
+.text-ued{color:var(--ued-blue)!important}
+.ued-hero{background:radial-gradient(circle at 85% -20%,rgba(245,184,0,.45),transparent 45%),linear-gradient(120deg,var(--ued-blue-dark),var(--ued-blue));color:#fff;border-bottom:5px solid var(--ued-gold)}
+.ued-logo{width:84px;height:84px;border-radius:50%;background:#fff;border:4px solid var(--ued-gold);display:grid;place-items:center;box-shadow:0 6px 20px rgba(0,0,0,.25);flex-shrink:0}
+.ued-logo span{font-weight:800;color:var(--ued-blue);font-size:1.4rem;letter-spacing:1px}
+.ued-kicker{color:var(--ued-gold);font-weight:700;font-size:.78rem;letter-spacing:.12em}
+.ued-title{font-weight:800;font-size:clamp(1.6rem,4vw,2.4rem);margin:.15rem 0}
+.ued-sub{opacity:.85;font-size:.95rem}
+.ued-stats{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);border-radius:var(--radius);padding:.6rem 1.2rem;min-width:130px}
+.ued-stats .num{font-weight:800;font-size:1.5rem;color:var(--ued-gold);line-height:1}
+.ued-stats .lbl{font-size:.72rem;opacity:.85}
+.card{border:none;border-radius:var(--radius);box-shadow:0 4px 18px rgba(11,78,162,.08);background:#fff}
+.section-title{font-weight:700;color:var(--ued-blue);font-size:1.05rem;margin-bottom:1rem}
+.section-title i{color:var(--ued-gold-dark);margin-right:.35rem}
+.card-input-section{border-top:4px solid var(--ued-gold)}
+.form-label{font-weight:600;color:#5a6b80;margin-bottom:.25rem}
+.form-control,.form-select{border-radius:10px;border-color:#d6e0ee}
+.form-control:focus,.form-select:focus{border-color:var(--ued-blue);box-shadow:0 0 0 .2rem rgba(11,78,162,.15)}
+.score-box{padding:1.1rem;text-align:center;color:#fff;transition:transform .2s}
+.score-box:hover{transform:translateY(-3px)}
+.score-box.old{background:linear-gradient(135deg,var(--ued-blue),#2f7be0)}
+.score-box.new{background:linear-gradient(135deg,var(--ued-gold-dark),var(--ued-gold));color:#3b2a00}
+.score-box.diff{background:#fff;color:var(--ued-blue);border:2px solid var(--ued-blue-soft)}
+.score-box.up{background:linear-gradient(135deg,#198754,#38c172);color:#fff}
+.score-box.down{background:linear-gradient(135deg,#c0392b,#e55b4d);color:#fff}
+.score-label{font-size:.78rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:.9}
+.score-value{font-size:2.4rem;font-weight:800;line-height:1.1}
+.progress{height:14px;border-radius:10px;background:var(--ued-blue-soft)}
+.progress-bar{background:linear-gradient(90deg,var(--ued-blue),var(--ued-gold));font-size:.7rem;font-weight:700}
+.btn-ued{background:var(--ued-blue);color:#fff;border-radius:10px;font-weight:600}
+.btn-ued:hover{background:var(--ued-blue-dark);color:#fff}
+.btn-ued-dark{background:linear-gradient(90deg,var(--ued-blue-dark),var(--ued-blue));color:#fff;border-radius:12px;font-weight:700;padding:.7rem}
+.btn-ued-dark:hover{color:var(--ued-gold)}
+.btn-gold{background:var(--ued-gold);color:#3b2a00;border-radius:10px;font-weight:700}
+.btn-gold:hover{background:var(--ued-gold-dark);color:#fff}
+.btn-outline-ued{border:1px solid var(--ued-blue);color:var(--ued-blue)}
+.btn-outline-ued:hover{background:var(--ued-blue);color:#fff}
+.btn-kanna{background:var(--ued-blue);color:#fff}
+.badge-gold{background:var(--ued-gold);color:#3b2a00}
+.mode-switch{display:flex;background:var(--ued-blue-soft);border-radius:12px;padding:4px;gap:4px}
+.mode-switch .btn{flex:1;border:none;border-radius:9px;color:var(--ued-blue);font-weight:600}
+.mode-switch .btn-check:checked+.btn{background:var(--ued-blue);color:#fff;box-shadow:0 3px 10px rgba(11,78,162,.3)}
+.dropzone{display:block;border:2px dashed #b9cbe6;border-radius:14px;padding:1.4rem;text-align:center;color:var(--ued-blue);cursor:pointer;background:#fafcff;transition:.2s}
+.dropzone.drag,.dropzone:hover{border-color:var(--ued-gold);background:var(--ued-gold-soft)}
+.dropzone img{max-width:100%;max-height:260px;border-radius:10px}
+.ued-table thead th{background:var(--ued-blue);color:#fff;font-weight:600;font-size:.85rem;border:none}
+.ued-table thead th:first-child{border-top-left-radius:10px}
+.ued-table thead th:last-child{border-top-right-radius:10px}
+.badge-grade{display:inline-block;min-width:42px;padding:.3rem .5rem;border-radius:8px;font-weight:800;color:#fff}
+.bg-A-plus{background:#0b7a3e}.bg-A{background:#198754}.bg-B{background:var(--ued-blue)}
+.bg-C{background:var(--ued-gold);color:#3b2a00}.bg-D{background:#e67e22}.bg-F{background:#c0392b}
+.suggestions-box{position:absolute;z-index:1000;left:0;right:0;top:100%;background:#fff;border-radius:12px;box-shadow:0 10px 28px rgba(0,0,0,.15);max-height:300px;overflow-y:auto;display:none}
+.suggestion-item{padding:.55rem .8rem;cursor:pointer;border-bottom:1px solid #f0f3f8}
+.suggestion-item:hover{background:var(--ued-gold-soft)}
+.suggestion-item .meta{font-size:.72rem;color:#7b8aa0}
+.suggestion-alert{background:var(--ued-gold-soft);border-left:4px solid var(--ued-gold);cursor:pointer;transition:.15s}
+.suggestion-alert:hover{transform:translateX(3px)}
+.ocr-row-low{background:#fff4e5}
+.ued-footer{color:#6b7a90}.ued-footer a{color:var(--ued-blue);font-weight:600}
+@media (max-width:576px){.score-value{font-size:1.9rem}.ued-logo{width:64px;height:64px}}

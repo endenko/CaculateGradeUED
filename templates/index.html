@@ -1,198 +1,167 @@
 <!DOCTYPE html>
 <html lang="vi">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UED Calculate Grade!</title>
+    <title>UED Calculate Grade — Trường ĐH Sư phạm, ĐH Đà Nẵng</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-
 <body>
+<header class="ued-hero">
+    <div class="container d-flex flex-column flex-md-row align-items-center gap-3 py-4">
+        <div class="ued-logo" aria-hidden="true"><span>UED</span></div>
+        <div class="text-center text-md-start flex-grow-1">
+            <div class="ued-kicker">ĐẠI HỌC ĐÀ NẴNG · TRƯỜNG ĐẠI HỌC SƯ PHẠM</div>
+            <h1 class="ued-title">UED Calculate Grade</h1>
+            <p class="ued-sub mb-0">Quét bảng điểm (máy tính &amp; viết tay) · Tính GPA · Giả lập học lại · Điểm rèn luyện</p>
+        </div>
+        <div class="ued-stats text-center" id="dbStats">
+            <div class="num" id="statSubjects">…</div><div class="lbl">môn học</div>
+            <div class="num mt-1" id="statFaculties">…</div><div class="lbl">khoa / đơn vị</div>
+        </div>
+    </div>
+</header>
 
-    <div class="container py-5">
-        <div class="text-center mb-5">
-            <h1 style="color: var(--primary); font-weight: 800;">🌸 UED Calculate Grade!</h1>
-            <p class="text-muted">Quản lý điểm số, Gợi ý môn học & Tính ĐRL thông minh</p>
+<main class="container py-4">
+    <div class="row g-3 mb-4">
+        <div class="col-md-4"><div class="card score-box old">
+            <div class="score-label"><i class="fas fa-graduation-cap"></i> GPA hiện tại</div>
+            <div class="score-value" id="displayGPA">0.00</div></div></div>
+        <div class="col-md-4"><div class="card score-box new">
+            <div class="score-label"><i class="fas fa-flask"></i> GPA giả lập</div>
+            <div class="score-value" id="simulatedGPA">0.00</div>
+            <small id="statusText" class="opacity-75" style="font-size:.72rem;">Chưa thay đổi</small></div></div>
+        <div class="col-md-4"><div class="card score-box diff">
+            <div class="score-label"><i class="fas fa-arrows-up-down"></i> Chênh lệch</div>
+            <div class="score-value" id="diffGPA">0.00</div></div></div>
+    </div>
+
+    <div class="card p-3 mb-4">
+        <div class="d-flex justify-content-between mb-2">
+            <span class="fw-bold small text-ued">TIẾN ĐỘ TỐT NGHIỆP</span>
+            <span class="fw-bold small text-ued" id="progressText">0 / 130 TC</span>
+        </div>
+        <div class="progress"><div id="gradProgressBar" class="progress-bar" role="progressbar" style="width:0%">0%</div></div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card p-4 mb-4 card-input-section">
+                <h5 class="section-title"><i class="fas fa-keyboard"></i> Nhập môn học</h5>
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label small">Khoa (lọc gợi ý)</label>
+                        <select id="khoaFilter" class="form-select"><option value="">Tất cả các khoa</option></select>
+                    </div>
+                    <div class="col-12 col-md-8 position-relative">
+                        <label class="form-label small">Tên môn / mã học phần (gõ không dấu cũng được)</label>
+                        <input type="text" id="inputName" class="form-control" placeholder="VD: giai tich, Tư tưởng HCM, 31231389..."
+                               onkeyup="searchSubject()" autocomplete="off">
+                        <div id="suggestions" class="suggestions-box"></div>
+                    </div>
+                    <div class="col-4 col-md-3">
+                        <label class="form-label small">Tín chỉ</label>
+                        <input type="number" id="inputCredits" class="form-control text-center" value="3" min="1" max="15"
+                               oninput="if(this.value > 15) this.value = 15; if(this.value < 1 && this.value !== '') this.value = 1;">
+                    </div>
+                    <div class="col-4 col-md-3">
+                        <label class="form-label small">Hệ 10</label>
+                        <input type="number" id="inputGrade10" class="form-control text-center" step="0.1" min="0" max="10"
+                               placeholder="8.5" oninput="convertGrade()">
+                    </div>
+                    <div class="col-4 col-md-3">
+                        <label class="form-label small">Hệ chữ</label>
+                        <input type="text" id="inputGrade4" class="form-control text-center fw-bold" readonly placeholder="A">
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <button class="btn btn-ued w-100" onclick="addManualSubject()"><i class="fas fa-plus"></i> Thêm</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card p-4 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="section-title mb-0"><i class="fas fa-camera"></i> Quét ảnh bảng điểm</h5>
+                    <span class="badge badge-gold" id="ocrLoading" style="display:none;">Đang nhận diện… <i class="fas fa-spinner fa-spin"></i></span>
+                </div>
+                <div class="mode-switch mb-3" role="group">
+                    <input type="radio" class="btn-check" name="ocrMode" id="modeComputer" value="computer" checked>
+                    <label class="btn" for="modeComputer"><i class="fas fa-desktop"></i> Ảnh chụp Portal</label>
+                    <input type="radio" class="btn-check" name="ocrMode" id="modeHand" value="handwriting">
+                    <label class="btn" for="modeHand"><i class="fas fa-pen-fancy"></i> Ảnh viết tay</label>
+                </div>
+                <label class="dropzone" id="dropzone" for="ocrFile">
+                    <img id="ocrPreview" alt="" style="display:none;">
+                    <div id="dropHint"><i class="fas fa-cloud-arrow-up fa-2x mb-2"></i><br>
+                        Kéo thả ảnh vào đây hoặc <u>chọn ảnh</u><br>
+                        <small class="text-muted">OCR miễn phí, chạy offline: PaddleOCR (phát hiện chữ) + VietOCR (nhận dạng tiếng Việt)</small></div>
+                </label>
+                <input type="file" id="ocrFile" class="d-none" accept="image/*">
+                <button class="btn btn-ued-dark w-100 mt-3" onclick="uploadOCR()"><i class="fas fa-wand-magic-sparkles"></i> Quét ngay</button>
+                <div id="ocrReview" class="mt-3" style="display:none;"></div>
+            </div>
+
+            <div class="card p-4 mb-4">
+                <div class="d-flex flex-wrap gap-2 justify-content-between mb-3">
+                    <h5 class="section-title mb-0"><i class="fas fa-list-ul"></i> Bảng điểm của bạn</h5>
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-outline-ued" onclick="resetSimulation()">🔄 Reset giả lập</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="clearAllData()">🗑️ Xóa hết</button>
+                    </div>
+                </div>
+                <div class="table-responsive" style="max-height:520px;overflow-y:auto;">
+                    <table class="table table-hover align-middle ued-table">
+                        <thead class="sticky-top"><tr>
+                            <th>Môn học</th><th class="text-center">TC</th><th class="text-center">Điểm</th>
+                            <th class="text-center" style="width:140px;">Giả lập</th><th class="text-center">Xóa</th></tr></thead>
+                        <tbody id="transcriptTable"></tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
-        <div class="row mb-4 g-3">
-            <div class="col-md-4">
-                <div class="card score-box old">
-                    <div class="score-label">GPA HIỆN TẠI</div>
-                    <div class="score-value" id="displayGPA">0.00</div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card score-box new">
-                    <div class="score-label">GPA GIẢ LẬP</div>
-                    <div class="score-value" id="simulatedGPA">0.00</div>
-                    <small id="statusText" class="text-muted" style="font-size: 0.7rem;">Chưa thay đổi</small>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card score-box diff">
-                    <div class="score-label">ĐỘ CHÊNH LỆCH</div>
-                    <div class="score-value" id="diffGPA">0.00</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="card p-3 mb-4 shadow-sm border-0">
-            <div class="d-flex justify-content-between mb-1">
-                <span class="fw-bold text-secondary small">TIẾN ĐỘ TỐT NGHIỆP</span>
-                <span class="fw-bold text-primary small" id="progressText">0 / 130 TC</span>
-            </div>
-            <div class="progress">
-                <div id="gradProgressBar" class="progress-bar progress-bar-striped progress-bar-animated"
-                    role="progressbar" style="width: 0%">0%</div>
-            </div>
-        </div>
-
-        <div class="row g-4">
-            <div class="col-lg-8">
-
-                <div class="card p-4 mb-4 border-primary shadow-sm card-input-section">
-                    <h5 class="fw-bold text-primary mb-3"><i class="fas fa-keyboard"></i> Nhập Môn Học Mới</h5>
-                    <div class="row g-2 align-items-end">
-                        <div class="col-md-5 position-relative">
-                            <label class="small fw-bold text-muted">Tên môn học (Gõ để gợi ý)</label>
-                            <input type="text" id="inputName" class="form-control" placeholder="Ví dụ: Cơ sở..."
-                                onkeyup="searchSubject()" autocomplete="off">
-                            <div id="suggestions" class="suggestions-box"></div>
-                        </div>
-                        <div class="col-md-2">
-                            <label class="small fw-bold text-muted">Tín chỉ</label>
-                            <input type="number" id="inputCredits" class="form-control text-center" value="3" min="1"
-                                max="4"
-                                oninput="if(this.value > 4) this.value = 4; if(this.value < 1 && this.value !== '') this.value = 1;">
-                        </div>
-                        <div class="col-md-2">
-                            <label class="small fw-bold text-muted">Hệ 10</label>
-                            <input type="number" id="inputGrade10" class="form-control text-center" step="0.1" min="0"
-                                max="10" placeholder="8.5" oninput="convertGrade()">
-                        </div>
-                        <div class="col-md-2">
-                            <label class="small fw-bold text-muted">Hệ 4</label>
-                            <input type="text" id="inputGrade4" class="form-control text-center fw-bold text-primary"
-                                readonly placeholder="A">
-                        </div>
-                        <div class="col-md-1">
-                            <button class="btn btn-kanna w-100" onclick="addManualSubject()"><i
-                                    class="fas fa-plus"></i></button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card p-4 mb-4">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h6 class="fw-bold text-muted small"><i class="fas fa-camera"></i> Quét ảnh bảng điểm</h6>
-                        <span class="badge bg-warning text-dark" id="ocrLoading" style="display:none;">Đang xử lý... <i
-                                class="fas fa-spinner fa-spin"></i></span>
-                    </div>
-
-                    <div class="btn-group w-100 mb-3" role="group">
-                        <input type="radio" class="btn-check" name="ocrMode" id="modeComputer" value="computer" checked>
-                        <label class="btn btn-outline-primary" for="modeComputer"><i class="fas fa-desktop"></i> Ảnh
-                            Portal (Local OCR)</label>
-
-                        <input type="radio" class="btn-check" name="ocrMode" id="modeHand" value="handwriting">
-                        <label class="btn btn-outline-success" for="modeHand"><i class="fas fa-pen-fancy"></i> Ảnh Viết
-                            Tay (Google Vision)</label>
-                    </div>
-
-                    <div class="d-flex gap-2">
-                        <input type="file" id="ocrFile" class="form-control" accept="image/*">
-                        <button class="btn btn-dark" onclick="uploadOCR()"><i class="fas fa-magic"></i> Quét
-                            Ngay</button>
-                    </div>
-                </div>
-
-                <div class="card p-4 mb-4">
-                    <div class="d-flex justify-content-between mb-3">
-                        <h5 class="fw-bold text-secondary"><i class="fas fa-list-ul"></i> Bảng Điểm Của Bạn</h5>
-                        <div class="btn-group">
-                            <button class="btn btn-sm btn-outline-primary" onclick="resetSimulation()">🔄 Reset Giả
-                                lập</button>
-                            <button class="btn btn-sm btn-outline-danger" onclick="clearAllData()">🗑️ Xóa hết</button>
-                        </div>
-                    </div>
-                    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
-                        <table class="table table-hover align-middle">
-                            <thead class="table-light sticky-top">
-                                <tr>
-                                    <th>Môn học</th>
-                                    <th class="text-center">TC</th>
-                                    <th class="text-center">Điểm</th>
-                                    <th class="text-center" style="width: 140px;">Giả Lập</th>
-                                    <th class="text-center">Xóa</th>
-                                </tr>
-                            </thead>
-                            <tbody id="transcriptTable">
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+        <div class="col-lg-4">
+            <div class="card p-3 mb-3">
+                <h5 class="section-title"><i class="fas fa-calculator"></i> Tính toán ra trường</h5>
+                <div class="mb-2"><label class="form-label small">Tổng tín chỉ quy định</label>
+                    <input type="number" id="targetCredits" class="form-control form-control-sm" value="130" onchange="calculateStats()"></div>
+                <div class="mb-2"><label class="form-label small">Số tín chỉ còn lại</label>
+                    <input type="text" id="remainingCredits" class="form-control form-control-sm bg-white" readonly value="130"></div>
+                <div class="mb-2"><label class="form-label small">Mục tiêu xếp loại</label>
+                    <select id="goalGPA" class="form-select form-select-sm">
+                        <option value="3.6">Xuất sắc (3.6+)</option><option value="3.2">Giỏi (3.2+)</option><option value="2.5">Khá (2.5+)</option>
+                    </select></div>
+                <button class="btn btn-ued w-100 btn-sm mb-2" onclick="calculateGraduationPath()">🚀 Tính toán</button>
+                <div id="gradResult" class="p-2 rounded text-center small" style="display:none;"></div>
             </div>
 
-            <div class="col-lg-4">
-                <div class="card p-3 mb-3 border-primary shadow-sm">
-                    <h5 class="fw-bold text-primary mb-3"><i class="fas fa-calculator"></i> Tính Toán Ra Trường</h5>
-                    <div class="mb-2">
-                        <label class="small fw-bold text-muted">Tổng tín chỉ quy định</label>
-                        <input type="number" id="targetCredits" class="form-control form-control-sm" value="130"
-                            onchange="calculateStats()">
-                    </div>
-                    <div class="mb-2">
-                        <label class="small fw-bold text-muted">Số tín chỉ còn lại</label>
-                        <input type="text" id="remainingCredits" class="form-control form-control-sm bg-white" readonly
-                            value="130">
-                    </div>
-                    <div class="mb-2">
-                        <label class="small fw-bold text-muted">Mục tiêu Xếp loại</label>
-                        <select id="goalGPA" class="form-select form-select-sm">
-                            <option value="3.6">Xuất Sắc (3.6+)</option>
-                            <option value="3.2">Giỏi (3.2+)</option>
-                            <option value="2.5">Khá (2.5+)</option>
-                        </select>
-                    </div>
-                    <button class="btn btn-primary w-100 btn-sm mb-2" onclick="calculateGraduationPath()">🚀 Tính
-                        toán</button>
-                    <div id="gradResult" class="p-2 rounded text-center small" style="display:none;"></div>
-                </div>
+            <div class="card p-3 mb-3">
+                <h5 class="section-title"><i class="fas fa-user-graduate"></i> Điểm rèn luyện</h5>
+                <div class="mb-2"><label class="form-label small">Mục tiêu cả năm</label>
+                    <select id="drlTarget" class="form-select form-select-sm">
+                        <option value="90">Xuất sắc (90+)</option><option value="80">Tốt (80+)</option>
+                        <option value="70">Khá (70+)</option><option value="65">TB Khá (65+)</option>
+                    </select></div>
+                <div class="mb-2"><label class="form-label small">Điểm ĐRL kỳ 1</label>
+                    <input type="number" id="drlSem1" class="form-control form-control-sm" placeholder="VD: 85"></div>
+                <button class="btn btn-gold w-100 btn-sm mb-2" onclick="calcDRL()">Tính toán ĐRL</button>
+                <div id="drlResult" class="alert alert-light border text-center small p-2" style="display:none;"></div>
+            </div>
 
-                <div class="card p-3 mb-3 border-success shadow-sm">
-                    <h5 class="fw-bold text-success mb-3"><i class="fas fa-user-graduate"></i> Tính Điểm Rèn Luyện</h5>
-                    <div class="mb-2">
-                        <label class="small text-muted">Mục tiêu cả năm</label>
-                        <select id="drlTarget" class="form-select form-select-sm">
-                            <option value="90">Xuất sắc (90+)</option>
-                            <option value="80">Tốt (80+)</option>
-                            <option value="70">Khá (70+)</option>
-                            <option value="65">TB Khá (65+)</option>
-                        </select>
-                    </div>
-                    <div class="mb-2">
-                        <label class="small text-muted">Điểm ĐRL Kỳ 1</label>
-                        <input type="number" id="drlSem1" class="form-control form-control-sm" placeholder="VD: 85">
-                    </div>
-                    <button class="btn btn-success w-100 btn-sm mb-2" onclick="calcDRL()">Tính toán ĐRL</button>
-                    <div id="drlResult" class="alert alert-light border text-center small p-2" style="display:none;">
-                    </div>
-                </div>
-
-                <div class="card p-3 mb-4">
-                    <h6 class="fw-bold text-warning"><i class="fas fa-lightbulb"></i> Nên học lại môn nào?</h6>
-                    <div id="suggestionList" class="d-flex flex-column gap-2 mt-2"></div>
-                </div>
+            <div class="card p-3 mb-4">
+                <h5 class="section-title"><i class="fas fa-lightbulb"></i> Nên học lại môn nào?</h5>
+                <div id="suggestionList" class="d-flex flex-column gap-2 mt-2"></div>
             </div>
         </div>
     </div>
-
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</main>
+<footer class="ued-footer text-center py-3 small">
+    Dữ liệu môn học: Chương trình đào tạo khóa 2025 — <a href="https://ued.udn.vn/2025/11/09/chuong-trinh-dao-tao-ke-hoach-dao-tao-ap-dung-cho-khoa-ts-2025/" target="_blank" rel="noopener">ued.udn.vn</a>
+</footer>
+<script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
-
 </html>

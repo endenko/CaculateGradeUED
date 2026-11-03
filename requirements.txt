@@ -8,3 +8,12 @@ numpy>=1.26,<3
 paddlepaddle>=3.0,<4
 paddleocr>=3.0,<4
 gunicorn>=22,<24
+rapidfuzz>=3.0
+# VietOCR (pbcquoc/vietocr, Apache-2.0) — Vietnamese text recognizer used with PaddleOCR detection.
+# Install torch CPU first:  pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+# vietocr pins very old deps, so install it with --no-deps (see README):  pip install --no-deps vietocr==0.3.13
+einops>=0.6
+gdown>=4.7
+pyyaml>=6
+pillow>=10
+prefetch_generator>=1.0

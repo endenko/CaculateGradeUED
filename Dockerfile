@@ -7,7 +7,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     TESSERACT_CMD=/usr/bin/tesseract \
     DB_PATH=/app/data/grade.db \
-    OCR_HANDWRITING_ENGINE=paddle \
+    OCR_HANDWRITING_ENGINE=vietocr \
     OCR_MODEL_SIZE=hybrid \
     UPLOAD_FOLDER=/app/uploads \
     OMP_NUM_THREADS=2 \
@@ -26,7 +26,9 @@ WORKDIR /app
 
 # --- Python deps (cached layer) ---
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu \
+ && pip install --no-cache-dir -r requirements.txt \
+ && pip install --no-cache-dir --no-deps vietocr==0.3.13
 
 # --- App code ---
 COPY . .
