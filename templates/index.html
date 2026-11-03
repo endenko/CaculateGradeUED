@@ -153,8 +153,9 @@
                     <img id="ocrPreview" alt="" style="display:none;">
                     <div id="dropHint"><i class="fas fa-cloud-arrow-up fa-2x mb-2"></i><br>
                         Kéo thả ảnh vào đây hoặc <u>chọn ảnh</u><br>
-                        <small class="text-muted">Ảnh điện thoại: cắt trong thư viện ảnh sao cho còn dòng Học kỳ / Năm học, cả bảng và phần tổng, rồi chọn <b>Ảnh điện thoại</b>. Ảnh HEIC (iPhone) gửi được. Cạnh dài hơn 2000 điểm ảnh được thu nhỏ trên máy bạn trước khi gửi.</small></div>
+                        <small class="text-muted">Sau khi chọn ảnh Portal hoặc điện thoại, kéo khung cắt cho còn dòng Học kỳ / Năm học, cả bảng và phần tổng. Ảnh HEIC gửi được; nếu máy không cắt được HEIC thì ảnh gốc được gửi.</small></div>
                 </label>
+                <p id="cropNote" class="small text-ued mt-2 mb-0" hidden></p>
                 <input type="file" id="ocrFile" class="d-none" accept="image/*,.heic,.heif,image/heic,image/heif">
                 <button class="btn btn-ued-dark w-100 mt-3" onclick="uploadOCR()"><i class="fas fa-wand-magic-sparkles"></i> Quét ngay</button>
                 <div id="ocrReview" class="mt-3" style="display:none;"></div>
@@ -364,96 +365,94 @@
     <details class="guide-item" id="guide-quet" open>
         <summary>Quét ảnh</summary>
         <div class="guide-body">
-            <p>Lấy bảng điểm trên QLHT, cắt đúng vùng, rồi đưa ảnh vào trang này. Máy đọc chữ, bạn kiểm tra rồi mới thêm vào bảng.</p>
+            <p>Lấy bảng điểm trên QLHT, cắt đúng khối học kỳ, rồi đưa ảnh vào trang này. Máy đọc chữ, bạn kiểm tra rồi mới thêm vào bảng.</p>
             <h6>1. Mở QLHT</h6>
-            <p>QLHT là cổng điểm của trường: <a href="https://qlht.ued.udn.vn/" target="_blank" rel="noopener">qlht.ued.udn.vn</a>.</p>
+            <p>Trang đăng nhập sinh viên: <a href="https://qlht.ued.udn.vn/sinhvien" target="_blank" rel="noopener">qlht.ued.udn.vn/sinhvien</a>.</p>
             <figure class="guide-fig">
-                <img src="{{ url_for('static', filename='guide/step-mo-qlht.png') }}" alt="Trình duyệt mở địa chỉ qlht.ued.udn.vn">
-                <figcaption>Bước 1. Gõ địa chỉ trên, không dùng trang khác.</figcaption>
+                <img src="{{ url_for('static', filename='guide/qlht-1-login.webp') }}" alt="Trang đăng nhập QLHT tại qlht.ued.udn.vn/sinhvien">
+                <figcaption>Bước 1. Mở đúng địa chỉ này. Cột bên phải là thông báo của cổng, không phải bảng điểm.</figcaption>
             </figure>
             <h6>2. Đăng nhập</h6>
             <figure class="guide-fig">
-                <img src="{{ url_for('static', filename='guide/step-dang-nhap.png') }}" alt="Sơ đồ ô tài khoản, mật khẩu và nút đăng nhập">
-                <figcaption>Bước 2. Điền tài khoản sinh viên rồi bấm đăng nhập. Hình là sơ đồ, không phải màn hình thật của QLHT.</figcaption>
+                <img src="{{ url_for('static', filename='guide/qlht-2-login.webp') }}" alt="Ô Mã số đăng nhập, Mật khẩu và nút ĐĂNG NHẬP">
+                <figcaption>Bước 2. Điền <b>Mã số đăng nhập</b> và <b>Mật khẩu</b>, rồi bấm <b>ĐĂNG NHẬP</b>.</figcaption>
             </figure>
-            <h6>3. Vào Bảng điểm hoặc Kết quả học tập</h6>
+            <h6>3. Bấm Kết quả học tập</h6>
             <figure class="guide-fig">
-                <img src="{{ url_for('static', filename='guide/step-bang-diem.png') }}" alt="Hai tên mục cần mở: Bảng điểm và Kết quả học tập">
-                <figcaption>Bước 3. Mở mục bảng điểm. Trên QLHT mục đó mang một trong hai tên này.</figcaption>
+                <img src="{{ url_for('static', filename='guide/qlht-3-menu.webp') }}" alt="Menu sinh viên, icon Kết quả học tập được khoanh">
+                <figcaption>Bước 3. Ở menu icon, bấm <b>Kết quả học tập</b> (khung vàng, số 3). Không bấm Đánh giá học phần.</figcaption>
             </figure>
-            <h6>4. Chọn học kỳ</h6>
             <figure class="guide-fig">
-                <img src="{{ url_for('static', filename='guide/step-chon-ky.png') }}" alt="Ô chọn Học kỳ 2 năm học 2024-2025">
-                <figcaption>Bước 4. Chọn kỳ bạn cần. Dòng Học kỳ / Năm học phải hiện trên trang trước khi chụp.</figcaption>
+                <img src="{{ url_for('static', filename='guide/qlht-4-icon.webp') }}" alt="Cận cảnh icon Kết quả học tập">
+                <figcaption>Icon cần bấm: người đứng cạnh máy tính.</figcaption>
             </figure>
-            <h6>5. Chụp và cắt</h6>
-            <div class="guide-steps">
-                <figure class="guide-fig">
-                    <img src="{{ url_for('static', filename='guide/step-cat-may.png') }}" alt="Khung trình duyệt, viền vàng quanh bảng điểm, phím tắt Windows và Mac">
-                    <figcaption>Máy tính: Snipping Tool với Win+Shift+S, hoặc Cmd+Shift+4 trên Mac. Viền vàng là vùng cần giữ.</figcaption>
-                </figure>
-                <figure class="guide-fig">
-                    <img src="{{ url_for('static', filename='guide/step-cat-dienthoai.png') }}" alt="Khung điện thoại, ảnh bảng điểm và các góc cắt">
-                    <figcaption>Điện thoại: chụp màn hình, rồi cắt trong ứng dụng ảnh. Giữ dòng học kỳ, cả bảng và phần tổng.</figcaption>
-                </figure>
-            </div>
+            <h6>4. Kéo tới khối học kỳ cần lấy</h6>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/qlht-5-table.webp') }}" alt="Bảng điểm Học kỳ 2 năm học 2024-2025">
+                <figcaption>Bước 4. Cuộn tới khối có dòng <b>Học kỳ … Năm học …</b>. Mỗi kỳ là một bảng riêng.</figcaption>
+            </figure>
+            <h6>5. Cắt từ dòng học kỳ tới phần tổng</h6>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/qlht-5-crop.webp') }}" alt="Khung cắt quanh cả bảng điểm và phần tổng">
+                <figcaption>Bước 5. Máy tính: Win+Shift+S (Snipping Tool) hoặc Cmd+Shift+4. Điện thoại: chụp màn hình rồi cắt trong ứng dụng ảnh. Khung đỏ-vàng là vùng giữ lại.</figcaption>
+            </figure>
             <h6>Cắt đúng và cắt sai</h6>
-            <p>Ảnh mẫu là bảng Học kỳ 2, năm học 2024-2025. Vòng đỏ trên ảnh chỉ chỗ dòng học kỳ — khi tự cắt bạn không cần vẽ vòng.</p>
             <div class="guide-compare">
                 <figure class="guide-fig">
-                    <img src="{{ url_for('static', filename='guide/crop-dung.png') }}" alt="Ảnh cắt đúng: còn dòng học kỳ, đủ cột và phần tổng">
+                    <img src="{{ url_for('static', filename='guide/crop-dung.webp') }}" alt="Ảnh cắt đúng, còn dòng học kỳ và phần tổng">
                     <figcaption><span class="tag-ok">Đúng</span> Còn dòng Học kỳ / Năm học, đủ cột, và khối tổng ở dưới.</figcaption>
                 </figure>
                 <figure class="guide-fig">
-                    <img src="{{ url_for('static', filename='guide/crop-sai-header.png') }}" alt="Ảnh cắt sai vì mất phần trên của dòng học kỳ">
-                    <figcaption><span class="tag-bad">Sai</span> Cụt dòng Học kỳ / Năm học. Trang không đoán kỳ.</figcaption>
+                    <img src="{{ url_for('static', filename='guide/crop-sai-header.webp') }}" alt="Ảnh cắt sai vì mất dòng học kỳ">
+                    <figcaption><span class="tag-bad">Sai</span> Mất dòng Học kỳ / Năm học. Trang ghi Không xác định được kỳ/năm.</figcaption>
                 </figure>
                 <figure class="guide-fig">
-                    <img src="{{ url_for('static', filename='guide/crop-sai-cot.png') }}" alt="Ảnh cắt sai vì mất các cột điểm bên phải">
-                    <figcaption><span class="tag-bad">Sai</span> Cụt cột. Thiếu điểm lần 1, lần 2 thì môn đọc sót.</figcaption>
+                    <img src="{{ url_for('static', filename='guide/crop-sai-cot.webp') }}" alt="Ảnh cắt sai vì mất cột điểm bên phải">
+                    <figcaption><span class="tag-bad">Sai</span> Cụt cột điểm. Môn sẽ thiếu điểm hoặc bị bỏ.</figcaption>
                 </figure>
                 <figure class="guide-fig">
-                    <img src="{{ url_for('static', filename='guide/crop-sai-mo.png') }}" alt="Ảnh cắt sai vì bị mờ">
-                    <figcaption><span class="tag-bad">Sai</span> Mờ, lóa, nghiêng mạnh. Chụp lại, để màn hình thẳng và đủ sáng.</figcaption>
+                    <img src="{{ url_for('static', filename='guide/crop-sai-mo.webp') }}" alt="Ảnh mờ không đọc được">
+                    <figcaption><span class="tag-bad">Sai</span> Mờ hoặc lóa. Chụp lại, màn hình thẳng và đủ sáng.</figcaption>
                 </figure>
             </div>
-            <h6>6. Đưa ảnh vào trang này</h6>
+            <h6>6. Cắt lại trên trang này, rồi quét</h6>
             <ol>
-                <li>Chọn <b>Ảnh chụp Portal</b> khi ảnh là màn hình máy tính, rõ, thẳng. Chọn <b>Ảnh điện thoại</b> khi là ảnh chụp màn hình điện thoại hoặc ảnh máy ảnh chụp màn hình (nghiêng, lóa, HEIC). Chọn <b>Ảnh viết tay</b> chỉ khi tờ giấy là chữ viết.</li>
-                <li>Kéo ảnh vào ô hoặc bấm chọn ảnh. Ảnh cạnh dài hơn 2000 điểm ảnh được thu nhỏ trên máy bạn trước khi gửi. iPhone gửi được HEIC; nếu máy chủ không đọc được định dạng đó, trang báo và hướng dẫn lưu JPEG.</li>
-                <li>Bấm <b>Quét ngay</b>. Ảnh xếp hàng, mỗi lúc máy chỉ đọc một ảnh. Trang hiện vị trí và số giây ước tính (trung bình vài lần quét gần nhất; lần đầu khoảng 24 giây). Mỗi máy được 5 ảnh mỗi phút và 30 ảnh mỗi giờ. Hàng đầy 20 ảnh thì phải đợi.</li>
-                <li>Xem lại từng dòng. Dòng khớp dưới 55% bỏ chọn sẵn. Giữ hoặc bỏ dấu tick, rồi bấm thêm các môn đã chọn.</li>
+                <li>Chọn <b>Ảnh chụp Portal</b> nếu ảnh màn hình máy tính đã rõ. Chọn <b>Ảnh điện thoại</b> nếu là ảnh chụp màn hình điện thoại hoặc ảnh máy chụp màn hình. <b>Ảnh viết tay</b> chỉ dùng cho giấy viết tay, và không mở khung cắt.</li>
+                <li>Chọn ảnh. Khung cắt hiện ra: kéo vùng, kéo góc, <b>Xoay 90°</b>, thanh <b>Nắn</b>, thanh <b>Phóng</b>. Trên điện thoại có thể kéo và chụm hai ngón. <b>Đặt lại</b> về gợi ý ban đầu. <b>Hủy</b> bỏ ảnh này.</li>
+                <li>Bấm <b>Xác nhận ảnh</b>. Ảnh đã cắt hiện trong ô. Xem lại, rồi bấm <b>Quét ngay</b> — lúc đó ảnh mới được gửi.</li>
+                <li>Đợi hàng. Mỗi lúc một ảnh. Trang ghi vị trí và số giây (lần đầu khoảng 24 giây). Mỗi máy 5 ảnh mỗi phút, 30 ảnh mỗi giờ. Hàng đầy 20 ảnh thì đợi.</li>
+                <li>Kiểm tra từng dòng. Dưới 55% khớp thì bỏ chọn sẵn. Nếu ảnh không phải bảng điểm, trang báo không thấy bảng điểm.</li>
             </ol>
             <div class="guide-steps">
                 <figure class="guide-fig">
-                    <img src="{{ url_for('static', filename='guide/app-upload.png') }}" alt="Ô tải ảnh với chế độ Ảnh điện thoại được chọn">
-                    <figcaption>Chọn chế độ, thấy dòng nhắc cắt ảnh điện thoại, rồi bấm Quét ngay.</figcaption>
+                    <img src="{{ url_for('static', filename='guide/app-crop.webp') }}" alt="Khung cắt ảnh trên trang tính điểm">
+                    <figcaption>Khung cắt: vùng vàng, xoay, nắn, phóng, rồi Xác nhận ảnh.</figcaption>
                 </figure>
                 <figure class="guide-fig">
-                    <img src="{{ url_for('static', filename='guide/app-queue.png') }}" alt="Dòng trạng thái hàng đợi khi đang quét">
-                    <figcaption>Đợi hàng. Trang ghi vị trí và số giây ước tính.</figcaption>
+                    <img src="{{ url_for('static', filename='guide/app-preview.webp') }}" alt="Ảnh đã cắt và nút Quét ngay">
+                    <figcaption>Xem ảnh đã cắt. Bấm Quét ngay mới gửi.</figcaption>
                 </figure>
                 <figure class="guide-fig">
-                    <img src="{{ url_for('static', filename='guide/app-review.png') }}" alt="Bảng kiểm tra từng môn trước khi thêm">
-                    <figcaption>Kiểm tra môn, tín chỉ, điểm. Bỏ dòng sai rồi xác nhận.</figcaption>
+                    <img src="{{ url_for('static', filename='guide/app-review.webp') }}" alt="Bảng kiểm tra môn trước khi thêm">
+                    <figcaption>Giữ dòng đúng, bỏ dòng sai, rồi thêm vào bảng.</figcaption>
                 </figure>
                 <figure class="guide-fig">
-                    <img src="{{ url_for('static', filename='guide/app-diemhp.png') }}" alt="Điểm học phần sau khi thêm môn từ ảnh">
-                    <figcaption>Điểm học phần nhận mọi môn của kỳ, kể cả môn chưa có điểm.</figcaption>
-                </figure>
-                <figure class="guide-fig">
-                    <img src="{{ url_for('static', filename='guide/app-diemtong.png') }}" alt="Điểm tổng sau khi thêm các môn đã có điểm">
-                    <figcaption>Điểm tổng chỉ nhận môn đã có điểm chữ.</figcaption>
+                    <img src="{{ url_for('static', filename='guide/app-diemhp.webp') }}" alt="Điểm học phần sau khi quét">
+                    <figcaption>Mọi môn của kỳ, kể cả môn chưa có điểm, vào Điểm học phần.</figcaption>
                 </figure>
             </div>
-            <p>Nếu ảnh có dòng học kỳ và năm học, các môn vào đúng kỳ đó. Nếu dòng bị cắt hoặc không đọc được, kỳ ghi <b>Không xác định được kỳ/năm</b>. Sang Điểm học phần, chọn năm và học kỳ rồi bấm <b>Gán kỳ cho môn đang xem</b>.</p>
-            <p>Môn đã có điểm chữ vào cả Điểm học phần của kỳ đó và Điểm tổng. Môn chưa có điểm (ô trống, đang học) chỉ vào Điểm học phần để bạn nhập điểm thành phần. Ảnh trên máy chủ bị xóa ngay sau khi đọc xong.</p>
+            <p>Có dòng học kỳ và năm học thì môn vào đúng kỳ. Thiếu dòng thì kỳ ghi <b>Không xác định được kỳ/năm</b>. Sang Điểm học phần, chọn năm và học kỳ rồi bấm <b>Gán kỳ cho môn đang xem</b>.</p>
+            <p>Môn đã có điểm chữ còn được chép sang Điểm tổng. Môn chưa có điểm chỉ ở Điểm học phần. Ảnh trên máy chủ bị xóa sau khi đọc. Ảnh HEIC mà máy chủ không mở được sẽ có câu hướng dẫn xuất JPEG.</p>
         </div>
     </details>
     <details class="guide-item" id="guide-tong">
         <summary>Điểm tổng</summary>
         <div class="guide-body">
-            <p>Bảng điểm các môn đã có điểm, dùng để xem CPA và thử học lại.</p>
+            <p>Bảng điểm các môn đã có điểm, dùng để xem CPA và thử học lại. Số trên ảnh khớp với các bước bên dưới.</p>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/app-tong.webp') }}" alt="Điểm tổng với các bước được đánh số">
+                <figcaption>Điểm tổng: thêm môn, ba ô CPA, cột giả lập, thanh tín chỉ, và các nút xuất / in / xóa.</figcaption>
+            </figure>
             <ol>
                 <li>Thêm tay: chọn khoa nếu muốn lọc, gõ tên hoặc mã, chọn môn trong gợi ý, nhập tín chỉ và điểm hệ 10 (ô hệ chữ tự đổi), chọn năm học, học kỳ, lần học. Dấu “chỉ đạt/không đạt” là điểm P, không vào CPA.</li>
                 <li>Ba ô trên cùng là CPA đang có, CPA giả lập, và chênh lệch. Cột <b>Giả lập học lại</b> đổi điểm tạm để xem CPA mới, không xóa điểm thật. <b>Reset giả lập</b> trả các ô về Giữ.</li>
@@ -467,6 +466,18 @@
         <summary>Điểm học phần</summary>
         <div class="guide-body">
             <p>Bảng một học kỳ: môn đã có điểm và môn đang học.</p>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/app-hp.webp') }}" alt="Điểm học phần, ô Đang xem và trọng số">
+                <figcaption>1 Đang xem. 2 Thêm môn chưa có điểm. 3 Trọng số 20 / 30 / 50.</figcaption>
+            </figure>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/app-sua.webp') }}" alt="Form Sửa với điểm bộ phận, giữa kỳ và điểm cuối kỳ cần đạt">
+                <figcaption>4 Bấm Sửa. Nhập bộ phận và giữa kỳ, để trống cuối kỳ để xem mức cần đạt từng chữ.</figcaption>
+            </figure>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/app-plans.webp') }}" alt="Danh sách phương án mục tiêu học kỳ">
+                <figcaption>5 Chọn mốc. Trang liệt kê tối đa 5 cách xếp chữ, cách dễ trước.</figcaption>
+            </figure>
             <ol>
                 <li><b>Đang xem</b> liệt kê các kỳ đã có môn. Đổi năm học hoặc học kỳ bên trái cũng chuyển kỳ đang xem.</li>
                 <li>Thêm môn chưa có điểm: gõ tên, chọn gợi ý, bấm <b>Thêm môn (chưa có điểm)</b>. Môn vào kỳ đang xem.</li>
@@ -480,6 +491,10 @@
         <summary>Mục tiêu CPA</summary>
         <div class="guide-body">
             <p>Xem CPA từ Điểm tổng cộng với các môn đang học của kỳ đang xem. Môn đã có điểm ở cả hai nơi chỉ tính một lần.</p>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/app-cpa.webp') }}" alt="Thẻ mục tiêu CPA với CPA hiện tại, tín chỉ, mốc và phần thiếu">
+                <figcaption>Đổi mốc là trang tính lại ngay: CPA, tín chỉ, mốc, phần thiếu hoặc vượt, và thanh tiến độ.</figcaption>
+            </figure>
             <ol>
                 <li>Chọn mốc. Trang tính ngay, không cần bấm thêm.</li>
                 <li>Bốn ô: CPA hiện tại, số tín chỉ đang tính, mốc, và thiếu hoặc vượt bao nhiêu. Thanh phía dưới là CPA so với mốc.</li>
@@ -493,6 +508,10 @@
         <summary>Điểm rèn luyện</summary>
         <div class="guide-body">
             <p>Cộng điểm phiếu tự đánh giá. Các ý và điểm tối đa lấy từ mẫu B01.QT824-02, học kỳ Thu 2025–2026, theo Quyết định 3758/QĐ-ĐHĐN (hướng dẫn Thông tư 16/2015).</p>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/app-drl.webp') }}" alt="Phiếu điểm rèn luyện và nút Xếp loại">
+                <figcaption>Nhập từng ý, chọn kỷ luật nếu có, rồi bấm Xếp loại.</figcaption>
+            </figure>
             <ol>
                 <li>Nhập từng ý, không quá điểm ghi bên cạnh. Ý ĐTBCHK chỉ chọn một mức.</li>
                 <li>Chọn kỷ luật đang chịu, nếu có. Khiển trách không xếp quá Khá, cảnh cáo không xếp quá Trung bình, đình chỉ hoặc buộc thôi học thì không đánh giá.</li>
@@ -505,6 +524,10 @@
         <summary>Bảng tin</summary>
         <div class="guide-body">
             <p>Tin công khai trên ued.udn.vn. Không có chỗ đăng bài trên trang này.</p>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/app-tin.webp') }}" alt="Bảng tin với các nhóm và nút Tải lại">
+                <figcaption>Các nhóm bài, nút Tải lại, và lịch chỉ khi bài ghi đủ ngày.</figcaption>
+            </figure>
             <ol>
                 <li>Mở tab Bảng tin. Bài được kéo về và chia nhóm (tất cả, thạc sĩ, học tập, tiếng Anh, quốc phòng, học bổng, khác).</li>
                 <li>Bấm tiêu đề để mở bài gốc. <b>Tải lại</b> xin bản mới.</li>
@@ -512,6 +535,29 @@
                 <li>Khung Facebook là trang nhà trường nhúng sẵn. Trang không đọc được bài fanpage khi bạn chưa đăng nhập Facebook.</li>
             </ol>
             <p>Máy chủ giữ bản tin khoảng 30 phút. Bản trên đĩa mất khi dịch vụ ngủ hoặc được đưa bản mới lên, khi đó trang tải lại.</p>
+        </div>
+    </details>
+    <details class="guide-item" id="guide-tinh">
+        <summary>Cách tính điểm</summary>
+        <div class="guide-body">
+            <p>Các số dưới đây là cách trang đang tính, không phải toàn bộ quy chế.</p>
+            <h6>Điểm một học phần</h6>
+            <p>Điểm hệ 10 = làm tròn 1 chữ số của BP × w1 + GK × w2 + CK × w3. Mặc định 20%, 30%, 50%. Ba ô không đủ 100 thì trang chia lại theo tỷ lệ vừa nhập. Làm tròn nửa đơn vị lên (8,25 thành 8,3) rồi mới đổi chữ.</p>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/calc-scale.webp') }}" alt="Công thức điểm thành phần và bảng quy đổi hệ 10 sang chữ và hệ 4">
+                <figcaption>Thang chữ ô nhập và Điểm học phần đang dùng. A+ và A cùng 4,0.</figcaption>
+            </figure>
+            <p>QĐ 1473 cho khóa 2020 trở về trước không có A+ và B+: A từ 8,5 là 4, B từ 7,0 là 3, C từ 5,5 là 2, D từ 4,0 là 1, dưới 4 là F. Ô chữ trên trang này vẫn theo thang có A+ và B+.</p>
+            <h6>CPA</h6>
+            <p>CPA = tổng (điểm hệ 4 × tín chỉ) chia tổng tín chỉ của các môn có chữ, làm tròn 2 số. Môn chưa có chữ không vào mẫu số. Điểm P (ô chỉ đạt / không đạt) không vào CPA trên thẻ Mục tiêu và không vào ô CPA của Điểm tổng. F = 0 vẫn ở trong mẫu số.</p>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/calc-example.webp') }}" alt="Ví dụ CPA 3,81 của học kỳ 2 năm 2024-2025">
+                <figcaption>Ảnh mẫu Học kỳ 2, 2024-2025: 80 / 21 = 3,81. Giáo dục thể chất 4 chưa có điểm nên đứng ngoài phép chia.</figcaption>
+            </figure>
+            <p>Trang không loại Giáo dục thể chất hay Giáo dục quốc phòng chỉ vì tên môn. Môn nào có chữ thì được tính. Dòng “tổng số tín chỉ học kỳ 22,00” trên portal vẫn cộng môn đang học; CPA 3,81 thì không.</p>
+            <p>Mỗi dòng đang nằm trong Điểm tổng được cộng riêng. Ghi thêm lần 2 không tự xóa lần 1. Muốn chỉ giữ lần học lại thì sửa hoặc xóa dòng cũ. Quy chế ở mục Quy định nói khác: QĐ 1586 lấy lần cuối nếu chưa đạt và lấy điểm cao hơn nếu đã đạt rồi học cải thiện; QĐ 1473 lấy lần cao nhất. Hai ô CPA trên trang không tự áp quy tắc đó.</p>
+            <h6>Mốc trên trang</h6>
+            <p>Ô mục tiêu có ba mốc: Xuất sắc 3,60, Giỏi 3,20, Khá 2,50. Hạng tốt nghiệp trong mã nguồn còn Trung bình từ 2,00; dưới 2,00 không có hạng tốt nghiệp. Hạng xuất sắc hoặc giỏi bị nhắc hạ một bậc chỉ khi tín chỉ từ lần 2 trở đi vượt 5% tổng tín chỉ chương trình (ô trên Điểm tổng, mặc định 130).</p>
         </div>
     </details>
     <details class="guide-item" id="guide-data">
@@ -563,6 +609,30 @@
     · Điểm: Thông tư 08/2021 và QĐ 1473/QĐ-ĐHSP-ĐT
     · Bảng tin: bài công khai ued.udn.vn
 </footer>
+<div id="cropModal" class="crop-modal" hidden>
+    <div class="crop-sheet" role="dialog" aria-modal="true" aria-labelledby="cropTitle">
+        <h5 id="cropTitle" class="section-title mb-1">Cắt ảnh trước khi quét</h5>
+        <p class="small text-muted mb-2">Kéo khung vàng, kéo góc để đổi cỡ. Giữ dòng Học kỳ / Năm học, cả bảng và phần tổng.</p>
+        <div id="cropStage" class="crop-stage">
+            <canvas id="cropCanvas"></canvas>
+            <div id="cropBox">
+                <i data-h="nw"></i><i data-h="n"></i><i data-h="ne"></i><i data-h="e"></i>
+                <i data-h="se"></i><i data-h="s"></i><i data-h="sw"></i><i data-h="w"></i>
+            </div>
+        </div>
+        <div class="crop-tools">
+            <button type="button" class="btn btn-outline-ued btn-sm" id="cropRot">Xoay 90°</button>
+            <label>Nắn <input id="cropStraight" type="range" min="-8" max="8" step="0.1" value="0" aria-label="Nắn thẳng"></label>
+            <label>Phóng <input id="cropZoom" type="range" min="1" max="4" step="0.05" value="1" aria-label="Phóng to"></label>
+            <button type="button" class="btn btn-outline-ued btn-sm" id="cropReset">Đặt lại</button>
+        </div>
+        <div class="crop-actions">
+            <button type="button" class="btn btn-outline-secondary" id="cropCancel">Hủy</button>
+            <button type="button" class="btn btn-ued" id="cropOk">Xác nhận ảnh</button>
+        </div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='crop.js') }}"></script>
 <script src="{{ url_for('static', filename='script.js') }}"></script>
 <script src="{{ url_for('static', filename='boards.js') }}"></script>
 <script src="{{ url_for('static', filename='academics-ui.js') }}"></script>

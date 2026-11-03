@@ -97,6 +97,61 @@ function addManualSubject() {
 
 let pendingOCR = [];
 let pendingTerm = null;
+let pendingScanFile = null;
+const NO_TABLE_MSG = 'Không thấy bảng điểm trong ảnh. Hãy cắt vùng có dòng Học kỳ / Năm học, đủ cột điểm và phần tổng ở dưới, rồi quét lại.';
+
+function isHeic(file) {
+    return /heic|heif/i.test(file.type || '') || /\.heic$|\.heif$/i.test(file.name || '');
+}
+
+function canDecodeImage(file) {
+    return new Promise((resolve) => {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => { URL.revokeObjectURL(url); resolve(true); };
+        img.onerror = () => { URL.revokeObjectURL(url); resolve(false); };
+        img.src = url;
+    });
+}
+
+function showCropNote(text) {
+    const note = document.getElementById('cropNote');
+    if (!note) return;
+    note.hidden = !text;
+    note.textContent = text || '';
+}
+
+async function beginScanFile(file) {
+    if (!file) return;
+    const mode = document.querySelector('input[name="ocrMode"]:checked').value;
+    showCropNote('');
+    if (mode === 'handwriting') {
+        pendingScanFile = file;
+        showPreview(file);
+        return;
+    }
+    if (isHeic(file) && !(await canDecodeImage(file))) {
+        pendingScanFile = file;
+        showCropNote('Trình duyệt không mở được HEIC để cắt. Bấm Quét ngay để gửi ảnh gốc. Nếu máy chủ không đọc được, hãy xuất JPEG.');
+        document.getElementById('ocrPreview').style.display = 'none';
+        document.getElementById('dropHint').style.display = 'block';
+        return;
+    }
+    try {
+        const cropped = await window.openCropper(file);
+        if (!cropped) {
+            document.getElementById('ocrFile').value = '';
+            return;
+        }
+        pendingScanFile = cropped;
+        showPreview(cropped);
+        showCropNote('Đã cắt. Xem lại ảnh, rồi bấm Quét ngay.');
+    } catch (err) {
+        pendingScanFile = file;
+        showPreview(file);
+        showCropNote('Không cắt được trên máy này. Bấm Quét ngay để gửi ảnh gốc.');
+    }
+}
 function escapeHtml(t) { return String(t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 function downscale(file, maxSide = 2000) {
@@ -116,11 +171,11 @@ function downscale(file, maxSide = 2000) {
 }
 
 async function uploadOCR() {
-    const fileInput = document.getElementById('ocrFile');
-    if (fileInput.files.length === 0) return alert("Vui lòng chọn ảnh trước bạn nhé!");
+    const file = pendingScanFile;
+    if (!file) return alert("Vui lòng chọn ảnh và xác nhận vùng cắt trước bạn nhé!");
     const mode = document.querySelector('input[name="ocrMode"]:checked').value;
     const formData = new FormData();
-    formData.append('file_anh', await downscale(fileInput.files[0]));
+    formData.append('file_anh', await downscale(file));
     formData.append('mode', mode);
     const loading = document.getElementById('ocrLoading');
     const queueBox = document.getElementById('ocrQueue');
@@ -136,6 +191,7 @@ async function uploadOCR() {
         const result = await pollOcr(ticket.id, queueBox);
         loading.style.display = 'none';
         if (!result || !result.success) return alert('Lỗi OCR: ' + ((result && result.error) || 'không rõ'));
+        if (!result.data || !result.data.length) return alert(NO_TABLE_MSG);
         pendingOCR = result.data;
         pendingTerm = result.term || null;
         renderOCRReview(result.engine);
@@ -170,7 +226,7 @@ async function pollOcr(id, queueBox) {
 function renderOCRReview(engine) {
     const box = document.getElementById('ocrReview');
     box.style.display = 'block';
-    if (!pendingOCR.length) { box.innerHTML = `<div class="alert alert-warning small mb-0">Không đọc được môn nào (engine: ${engine}). Thử ảnh rõ hơn / đúng chế độ.</div>`; return; }
+    if (!pendingOCR.length) { box.innerHTML = `<div class="alert alert-warning small mb-0">${NO_TABLE_MSG}</div>`; return; }
     let rows = pendingOCR.map((m, i) => {
         const pct = parseInt(m.percentage) || 0;
         return `<tr class="${pct < 70 ? 'ocr-row-low' : ''}">
@@ -221,10 +277,10 @@ function showPreview(file) {
 
 document.addEventListener('DOMContentLoaded', () => {
     const fi = document.getElementById('ocrFile'), dz = document.getElementById('dropzone');
-    fi.addEventListener('change', () => showPreview(fi.files[0]));
+    fi.addEventListener('change', () => beginScanFile(fi.files[0]));
     ['dragenter', 'dragover'].forEach(e => dz.addEventListener(e, ev => { ev.preventDefault(); dz.classList.add('drag'); }));
     ['dragleave', 'drop'].forEach(e => dz.addEventListener(e, ev => { ev.preventDefault(); dz.classList.remove('drag'); }));
-    dz.addEventListener('drop', ev => { if (ev.dataTransfer.files.length) { fi.files = ev.dataTransfer.files; showPreview(fi.files[0]); } });
+    dz.addEventListener('drop', ev => { if (ev.dataTransfer.files.length) beginScanFile(ev.dataTransfer.files[0]); });
     fetch('/api/stats').then(r => r.json()).then(st => {
         document.getElementById('statSubjects').innerText = st.subjects;
         document.getElementById('statFaculties').innerText = st.faculties.length;
@@ -324,8 +380,9 @@ function calculateStats() {
     let totalSimScore = 0;
 
     transcriptData.forEach(m => {
-        let realScore = gradeMap[m.diem_he_4] || 0;
-        let simScore = m.sim_grade ? gradeMap[m.sim_grade] : realScore;
+        if (m.pass_only || gradeMap[m.diem_he_4] == null) return;
+        let realScore = gradeMap[m.diem_he_4];
+        let simScore = m.sim_grade && gradeMap[m.sim_grade] != null ? gradeMap[m.sim_grade] : realScore;
 
         totalTin += m.tin_chi;
         totalRealScore += realScore * m.tin_chi;
