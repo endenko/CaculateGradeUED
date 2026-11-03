@@ -1,0 +1,6 @@
+.venv
+uploads
+tests
+tools
+LocalOCR.py
+*.db

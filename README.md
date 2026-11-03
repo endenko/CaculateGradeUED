@@ -1,3 +1,13 @@
+---
+title: UED Calculate Grade
+emoji: 🎓
+colorFrom: blue
+colorTo: yellow
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # 🌸 UED Calculate Grade!
 
 > **Hệ thống quản lý điểm số thông minh dành cho sinh viên Đại học Đà Nẵng**  
@@ -19,6 +29,18 @@
 - [Xử lý lỗi thường gặp](#-xử-lý-lỗi-thường-gặp)
 
 ---
+
+## Quy định điểm dùng trong ứng dụng (2025–2026)
+
+Máy tính bám văn bản đã đọc được, không tự đặt ngưỡng. Trang **Nguồn quy định** trong ứng dụng và file `docs/quy-che-nguon.md` ghi đường dẫn.
+
+- Thang chữ khóa 2021 trở đi: Quyết định 1586/QĐ-ĐHSP Điều 8 (A+ từ 9,5 = 4,0; A từ 8,5 = 4,0; B+ = 3,5; B = 3,0; C+ = 2,5; C = 2,0; D+ = 1,5; D = 1,0; F = 0). Khóa 2020 trở về trước: Quyết định 1473, chỉ A/B/C/D/F.
+- Cảnh báo học tập: Điều 11 Thông tư 08 và Điều 16 QĐ 1473.
+- Hạ một bậc tốt nghiệp: Điều 14.3 Thông tư 08 và Điều 25.2 QĐ 1473.
+- Điểm rèn luyện: Thông tư 16/2015/TT-BGDĐT Điều 4–10. Chưa thấy biểu mẫu chia nhỏ của riêng UED.
+- Bảng tin chỉ kéo bài công khai `https://ued.udn.vn/wp-json/wp/v2/posts`, cache khoảng 30 phút (`NEWS_CACHE_TTL`, mặc định file `/tmp/ued-news-cache.json`). Đĩa gói Render free mất khi dịch vụ ngủ hoặc deploy; cache được tạo lại khi có người mở bảng tin. Không có trang quản trị. Facebook (`facebook.com/ueddn`) không kéo bài vì không đọc được khi chưa đăng nhập — chỉ nhúng plugin Page.
+
+Toàn văn Quyết định 1498/QĐ-ĐHSP ngày 31/7/2025 (áp dụng từ khóa 2025) chưa lấy được, nên ứng dụng không kết luận buộc thôi học cho khóa 2021+ chỉ từ số lần cảnh báo.
 
 ## 🎯 Tổng quan hệ thống
 
@@ -554,3 +576,60 @@ OCRWEBSITE/
 - Dữ liệu **KHÔNG mất** khi đóng trình duyệt
 - Dữ liệu **SẼ MẤT** nếu xóa cache/cookie trình duyệt
 - Ảnh upload được lưu tạm trong thư mục `uploads/` (an toàn để xóa thủ công)
+
+---
+
+## 🆕 Cập nhật 11/2026 — VietOCR + CSDL toàn trường + giao diện UED
+
+### OCR (miễn phí 100%, offline)
+* **Mặc định (`OCR_HANDWRITING_ENGINE=vietocr`)**: PaddleOCR `PP-OCRv6_medium_det` (phát hiện dòng chữ) + **VietOCR `vgg_transformer`** ([pbcquoc/vietocr](https://github.com/pbcquoc/vietocr), Apache-2.0) để nhận dạng tiếng Việt có dấu. VietOCR phục hồi dấu tốt hơn hẳn PaddleOCR `lang='vi'` (VD: `Tu tung H Chí Minh` → `Tư tưởng Hồ Chí Minh`).
+* Chế độ "Ảnh Portal": dùng Tesseract nếu máy có, **nếu không có thì tự chuyển sang Paddle-det + VietOCR**.
+* Engine `paddle`, `tesseract`, `google` vẫn chọn được qua biến môi trường.
+
+Cài đặt (CPU):
+```bash
+python -m venv .venv && . .venv/bin/activate
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+pip install -r requirements.txt
+pip install --no-deps vietocr==0.3.13      # vietocr pin deps cũ -> cài no-deps
+python seed_db.py
+gunicorn --bind 0.0.0.0:5000 --workers 1 --threads 4 --timeout 300 app:app
+```
+
+### CSDL môn học toàn trường
+* `data/hoc_phan_ued.csv`: **2.141 dòng (mã HP × ngành), 1.360 mã học phần, ~1.230 tên môn duy nhất, 35 ngành, 8 khoa** — trích từ CTĐT khóa 2025 chính thức: <https://ued.udn.vn/2025/11/09/chuong-trinh-dao-tao-ke-hoach-dao-tao-ap-dung-cho-khoa-ts-2025/> (link PDF từng ngành ở `tools/ued_ctdt_2025_urls.txt`, cột `nguon`).
+* Các PDF là **bản scan** nên dữ liệu được OCR (`tools/ocr_pages.py`) rồi dựng lại bảng theo mã HP 8 chữ số (`tools/build_ued_courses.py`), tên môn chọn theo "bỏ phiếu" giữa các lần xuất hiện. ⚠️ Một số ít tên có thể còn lỗi OCR nhỏ; dòng không đọc được tín chỉ được đánh dấu `[tín chỉ: không đọc được]`.
+* Danh sách gốc khoa Tin (`data/danh_muc_mon.csv`) vẫn giữ nguyên.
+
+### Fuzzy matching
+`rapidfuzz` + chuẩn hoá bỏ dấu Unicode (NFD, đ→d) + mở rộng viết tắt (VN, HCM, ML, PPDH, GDTC…) + phạt lệch số thứ tự ("Giải tích 1" ≠ "2") + ưu tiên môn có số tín chỉ khớp; nếu dòng có **mã HP 8 số** thì tra thẳng mã (100%).
+
+### API mới
+`GET /api/stats`, `GET /api/faculties`, `GET /api/match?q=...`, `GET /api/search_subject?q=...&khoa=...`; `/health` trả trạng thái các engine OCR.
+
+### Kiểm thử
+`python tests/make_synthetic.py && python tests/eval_ocr.py` — ảnh viết tay giả lập (font Patrick Hand, xoay + nhiễu).
+
+
+## 🌐 Deploy online (1 server: giao diện + API Python + OCR)
+
+### Google Cloud Run (khuyên dùng — đăng nhập bằng tài khoản Google)
+Mở https://console.cloud.google.com → bật Billing (cần thẻ; trong free tier 180.000 vCPU-giây/tháng thì $0) → mở **Cloud Shell** và chạy:
+```bash
+git clone -b feature/vietocr-all-faculties-ued-ui https://github.com/endenko/CaculateGradeUED && cd CaculateGradeUED
+gcloud run deploy ued-grade --source . --region asia-southeast1 --allow-unauthenticated \
+  --memory 4Gi --cpu 2 --timeout 300 --concurrency 2 --max-instances 2
+```
+Cloud Run trả về URL công khai `https://ued-grade-xxxx.a.run.app`. Đặt `--max-instances` thấp để không vượt free tier.
+
+### Hugging Face Spaces (Docker)
+Tạo Space SDK *Docker*, push repo này (YAML đầu README đã khai báo `sdk: docker`, `app_port: 7860`). Lưu ý: từ 2026 Docker Space trên CPU Basic yêu cầu gói PRO.
+
+
+## ⚡ Bản nhẹ (mặc định khi deploy miễn phí, không cần thẻ)
+`requirements.txt` = Flask + **RapidOCR** (mô hình PaddleOCR PP-OCRv5 det + latin rec, chạy bằng onnxruntime, ~13 MB trong `models/`). Không cần torch/paddle.
+Đo trên máy: RAM đỉnh **~385 MB**, 0.5–2.5 s/ảnh; ảnh viết tay giả lập 9/10, ảnh Portal 6/6. Tên môn mất dấu sẽ được fuzzy matching sửa theo CSDL.
+Bật bằng `OCR_LIGHT=1` (tự bật khi chạy trên Vercel). Bản đầy đủ (VietOCR): `requirements-full.txt` + `Dockerfile`.
+
+* **Vercel (Hobby, không cần thẻ, đăng nhập GitHub)**: Import repo → framework Flask tự nhận (`vercel.json`). Python function ≤500 MB, 2 GB RAM, 1 vCPU.
+* **Render free (không cần thẻ, đăng nhập GitHub/Google)**: New → Blueprint → chọn repo (`render.yaml`, plan free 512 MB / 0.1 CPU, ngủ sau 15 phút).

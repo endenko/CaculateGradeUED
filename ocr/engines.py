@@ -21,21 +21,28 @@ import re
 import tempfile
 import threading
 
-import cv2
 import numpy as np
+try:
+    import cv2
+except Exception:  # pragma: no cover
+    cv2 = None
 
 # ---------------------------------------------------------------------------
 # Config from environment (no hardcoded Windows paths anymore)
 # ---------------------------------------------------------------------------
 TESSERACT_CMD = os.environ.get("TESSERACT_CMD", "").strip()
 
-if TESSERACT_CMD:
+try:
     import pytesseract
-    pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD
-else:
-    import pytesseract  # let pytesseract find tesseract on PATH (Docker: /usr/bin/tesseract)
+    if TESSERACT_CMD:
+        pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD
+except ImportError:  # light deployments
+    pytesseract = None
 
-OCR_HANDWRITING_ENGINE = os.environ.get("OCR_HANDWRITING_ENGINE", "paddle").strip().lower()
+# On serverless hosts (Vercel / Render free) default to the light ONNX engine
+_LIGHT_DEFAULT = 'rapid' if (os.environ.get('VERCEL') or os.environ.get('OCR_LIGHT') == '1') else 'vietocr'
+OCR_HANDWRITING_ENGINE = os.environ.get("OCR_HANDWRITING_ENGINE", _LIGHT_DEFAULT).strip().lower()
+OCR_COMPUTER_ENGINE = os.environ.get("OCR_COMPUTER_ENGINE", "auto").strip().lower()
 
 # ---------------------------------------------------------------------------
 # Shared image preprocessing (from original LocalOCR.py)
@@ -74,7 +81,13 @@ def tesseract_words(image_path):
 
 
 def tesseract_full_text(image_path):
-    """Plain text OCR (vie+eng) — used by /api/scan_detail_score (Điểm Bộ Phận / Giữa Kỳ)."""
+    """Plain text OCR (vie+eng) — used by /api/scan_detail_score (Điểm Bộ Phận / Giữa Kỳ).
+    Falls back to the VietOCR hybrid (line-joined) when Tesseract is not installed."""
+    import shutil
+    if not (TESSERACT_CMD or shutil.which('tesseract')):
+        words = rapid_words(image_path) if OCR_HANDWRITING_ENGINE == 'rapid' else hybrid_words(image_path)
+        words.sort(key=lambda w: (round(w['y'] / 20), w['x']))
+        return "\n".join(w['text'] for w in words)
     processed_img = preprocess_image(image_path)
     config = '--oem 3 --psm 6'
     return pytesseract.image_to_string(processed_img, lang='vie+eng', config=config)
@@ -250,6 +263,215 @@ def vietocr_words(image_path):
 
 
 # ===========================================================================
+# 2b) HYBRID: PaddleOCR text DETECTION + VietOCR (pbcquoc/vietocr) RECOGNITION
+#     VietOCR's vgg_transformer is trained on Vietnamese printed + handwritten
+#     text and restores diacritics far better than PaddleOCR lang='vi'
+#     (e.g. "Tu tung H Chí Minh" -> "Tư tưởng Hồ Chí Minh"). 100% free/offline.
+# ===========================================================================
+_hybrid_lock = threading.Lock()
+_det_model = None
+_vietocr_model = None
+VIETOCR_CONFIG = os.environ.get('VIETOCR_CONFIG', 'vgg_transformer')
+VIETOCR_WEIGHTS = os.environ.get('VIETOCR_WEIGHTS', os.path.expanduser('~/.cache/vietocr/vgg_transformer.pth'))
+
+
+def _vietocr_is_available():
+    try:
+        import vietocr  # noqa: F401
+        import torch  # noqa: F401
+        return _paddle_is_available()
+    except Exception:
+        return False
+
+
+def _get_hybrid():
+    global _det_model, _vietocr_model
+    if _det_model is None:
+        from paddleocr import TextDetection
+        det_name = os.environ.get('OCR_DET_MODEL', 'PP-OCRv6_medium_det')
+        _det_model = TextDetection(model_name=det_name, engine_config={'run_mode': PADDLE_RUN_MODE})
+    if _vietocr_model is None:
+        from vietocr.tool.config import Cfg
+        from vietocr.tool.predictor import Predictor
+        import functools
+        import vietocr.tool.predictor as _vp
+        from vietocr.tool.translate import translate as _tr
+        # cap decoding length: a crop without EOS otherwise decodes 128 steps and can stall for minutes on CPU
+        _vp.translate = functools.partial(_tr, max_seq_length=int(os.environ.get('VIETOCR_MAX_LEN', '64')))
+        cfg_file = os.environ.get('VIETOCR_CONFIG_FILE', '')
+        if cfg_file and os.path.exists(cfg_file):
+            cfg = Cfg.load_config_from_file(cfg_file)  # offline (saved at build time)
+        else:
+            cfg = Cfg.load_config_from_name(VIETOCR_CONFIG)
+            if cfg_file:
+                try:
+                    cfg.save(cfg_file)
+                except OSError:
+                    pass
+        if isinstance(cfg.get('cnn'), dict) and 'pretrained' in cfg['cnn']:
+            cfg['cnn']['pretrained'] = False  # full weights are loaded below; no torchvision download
+        if os.path.exists(VIETOCR_WEIGHTS):
+            cfg['weights'] = VIETOCR_WEIGHTS
+        cfg['device'] = os.environ.get('VIETOCR_DEVICE', 'cpu')
+        cfg['predictor']['beamsearch'] = False
+        _vietocr_model = Predictor(cfg)
+    return _det_model, _vietocr_model
+
+
+def _hybrid_once(path, limit_side_len=None):
+    from PIL import Image
+    det, rec = _get_hybrid()
+    kw = {'limit_side_len': limit_side_len} if limit_side_len else {}
+    res = list(det.predict(path, **kw))
+    polys = res[0]['dt_polys'] if res else []
+    im = Image.open(path).convert('RGB')
+    W, H = im.size
+    boxes, crops = [], []
+    rects = []
+    for q in polys:
+        pts = np.asarray(q, dtype=np.float64)
+        rects.append((pts[:, 0].min(), pts[:, 1].min(), pts[:, 0].max(), pts[:, 1].max()))
+    med_h = float(np.median([r[3] - r[1] for r in rects])) if rects else 0
+    for x1, y1, x2, y2 in rects:
+        if x2 - x1 < 3 or y2 - y1 < 3:
+            continue
+        # skip stamps / signatures / page-size blobs: they make the seq2seq
+        # decoder run for minutes and never contain grade text
+        if (y2 - y1) > max(4 * med_h, 0.25 * H) or (x2 - x1) > 0.95 * W:
+            continue
+        pad = max(2, int((y2 - y1) * 0.12))
+        crops.append(im.crop((max(0, x1 - pad), max(0, y1 - pad), min(W, x2 + pad), min(H, y2 + pad))))
+        boxes.append(((x1 + x2) / 2, (y1 + y2) / 2))
+    texts = rec.predict_batch(crops) if crops else []
+    return [{'text': t.strip(), 'x': float(b[0]), 'y': float(b[1])}
+            for t, b in zip(texts, boxes) if t and t.strip()]
+
+
+def hybrid_words(image_path):
+    """Paddle det + VietOCR rec, with the same upscale / second-pass tricks."""
+    tmp_path = None
+    try:
+        path = _prepare_image(image_path)
+        if path != image_path:
+            tmp_path = path
+        with _hybrid_lock:
+            words = _hybrid_once(path)
+            if _needs_second_pass(words):
+                try:
+                    words2 = _hybrid_once(path, limit_side_len=1920)
+                    words = _merge_word_lists(words, words2)
+                except Exception as e:
+                    print(f"[OCR] hybrid second pass failed: {e}")
+        return words
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+
+
+def _tesseract_is_available():
+    import shutil
+    return bool(TESSERACT_CMD or shutil.which('tesseract'))
+
+
+def engine_status():
+    return {
+        'handwriting_engine': OCR_HANDWRITING_ENGINE,
+        'vietocr': _vietocr_is_available(),
+        'paddleocr': _paddle_is_available(),
+        'tesseract': _tesseract_is_available(),
+        'google_vision': _google_is_available(),
+        'rapidocr': _rapid_is_available(),
+    }
+
+
+# ===========================================================================
+# 2c) LIGHT: RapidOCR (PaddleOCR models exported to ONNX, onnxruntime) — no torch,
+#     no paddle. ~25 MB of models, fits 512 MB-2 GB free hosts / Vercel Python.
+#     Diacritics are weaker; the DB fuzzy matcher restores the subject names.
+# ===========================================================================
+_rapid = None
+_rapid_lock = threading.Lock()
+MODELS_DIR = os.environ.get('MODELS_DIR', os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'models'))
+RAPID_PROFILE = os.environ.get('RAPID_PROFILE', 'latin')  # 'latin' (PP-OCRv5 latin rec) | 'v6' (PP-OCRv6 small)
+
+
+def _rapid_is_available():
+    try:
+        import rapidocr  # noqa: F401
+        return True
+    except Exception:
+        return False
+
+
+def _get_rapid():
+    global _rapid
+    if _rapid is None:
+        from rapidocr import RapidOCR, LangRec, OCRVersion, ModelType
+        if RAPID_PROFILE == 'v6':
+            det, rec = 'PP-OCRv6_det_small.onnx', 'PP-OCRv6_rec_small.onnx'
+            params = {}
+        else:
+            det, rec = 'ch_PP-OCRv5_det_mobile.onnx', 'latin_PP-OCRv5_rec_mobile.onnx'
+            params = {"Rec.lang_type": LangRec.LATIN, "Rec.ocr_version": OCRVersion.PPOCRV5,
+                      "Rec.model_type": ModelType.MOBILE, "Det.ocr_version": OCRVersion.PPOCRV5,
+                      "Det.model_type": ModelType.MOBILE}
+        params["Global.use_cls"] = False
+        # bound detector input -> bounded RAM (fits 512 MB hosts)
+        side = int(os.environ.get('RAPID_LIMIT_SIDE', '960'))
+        params["Det.limit_type"] = os.environ.get('RAPID_LIMIT_TYPE', 'max')
+        params["Det.limit_side_len"] = side
+        params["Global.max_side_len"] = side
+        params["Global.use_cls"] = False
+        threads = int(os.environ.get('OMP_NUM_THREADS', '1'))
+        params["EngineConfig.onnxruntime.intra_op_num_threads"] = threads
+        params["EngineConfig.onnxruntime.inter_op_num_threads"] = 1
+        params["EngineConfig.onnxruntime.enable_cpu_mem_arena"] = False
+        if os.path.exists(os.path.join(MODELS_DIR, det)):
+            params["Det.model_path"] = os.path.join(MODELS_DIR, det)
+        if os.path.exists(os.path.join(MODELS_DIR, rec)):
+            params["Rec.model_path"] = os.path.join(MODELS_DIR, rec)
+        _rapid = RapidOCR(params=params)
+    return _rapid
+
+
+def rapid_words(image_path):
+    tmp_path = None
+    try:
+        path = _prepare_image(image_path)
+        if path != image_path:
+            tmp_path = path
+        with _rapid_lock:
+            r = _get_rapid()(path)
+        words = []
+        if r is not None and r.boxes is not None:
+            for box, txt in zip(r.boxes, r.txts):
+                pts = np.asarray(box, dtype=np.float64)
+                if txt and txt.strip():
+                    words.append({'text': txt.strip(), 'x': float(pts[:, 0].mean()), 'y': float(pts[:, 1].mean())})
+        return words
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+        _release_ocr_memory()
+
+
+def _release_ocr_memory():
+    import gc
+    gc.collect()
+    try:
+        import ctypes
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
+    except Exception:
+        pass
+
+
+# ===========================================================================
 # 3) GOOGLE CLOUD VISION (OPTIONAL — only when explicitly enabled)
 # ===========================================================================
 def _google_is_available():
@@ -278,8 +500,15 @@ def google_words(image_path):
 # Dispatch helpers used by app.py
 # ===========================================================================
 def computer_words(image_path):
-    """Computer-screenshot mode: Tesseract (original behavior, kept)."""
-    return tesseract_words(image_path)
+    """Computer-screenshot mode: Tesseract if installed (original behavior),
+    otherwise the free PaddleOCR-det + VietOCR hybrid."""
+    if OCR_COMPUTER_ENGINE == 'rapid' or (OCR_COMPUTER_ENGINE == 'auto' and OCR_HANDWRITING_ENGINE == 'rapid'):
+        return rapid_words(image_path)
+    if OCR_COMPUTER_ENGINE in ('auto', 'tesseract') and _tesseract_is_available():
+        return tesseract_words(image_path)
+    if _vietocr_is_available():
+        return hybrid_words(image_path)
+    return vietocr_words(image_path)
 
 
 def handwriting_words(image_path):
@@ -289,12 +518,23 @@ def handwriting_words(image_path):
     Vietnamese engine is not available/installed, so the app never crashes.
     """
     engine = OCR_HANDWRITING_ENGINE
+    if engine == 'rapid' and _rapid_is_available():
+        return rapid_words(image_path), 'rapidocr-onnx'
     if engine == 'google' and _google_is_available():
         try:
             return google_words(image_path), 'google'
         except Exception as e:
             print(f"[OCR] Google Vision failed ({e}) -> falling back")
             engine = 'paddle'
+
+    if engine == 'vietocr' and _vietocr_is_available():
+        try:
+            return hybrid_words(image_path), 'paddle-det+vietocr'
+        except Exception as e:
+            print(f"[OCR] VietOCR hybrid failed ({e}) -> falling back to PaddleOCR")
+            engine = 'paddle'
+    elif engine == 'vietocr':
+        engine = 'paddle'
 
     if engine == 'paddle' and _paddle_is_available():
         try:
@@ -313,6 +553,9 @@ def warmup():
         try:
             _get_paddle_ocr()
             print("[warmup] PaddleOCR Vietnamese models ready")
+            if _vietocr_is_available():
+                _get_hybrid()
+                print("[warmup] VietOCR hybrid ready")
         except Exception as e:
             print(f"[warmup] PaddleOCR unavailable: {e}")
     print("[warmup] done")

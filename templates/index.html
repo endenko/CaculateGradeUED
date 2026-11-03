@@ -1,198 +1,640 @@
 <!DOCTYPE html>
 <html lang="vi">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UED Calculate Grade!</title>
+    <title>UED Calculate Grade — Trường ĐH Sư phạm, ĐH Đà Nẵng</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" sizes="32x32">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon-32.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-
 <body>
+<div class="site-top no-print">
+    <div class="container">
+        <a href="https://ued.udn.vn/" target="_blank" rel="noopener">Trang trường</a>
+        <a href="https://daotao.ued.udn.vn/" target="_blank" rel="noopener">Phòng Đào tạo</a>
+        <button type="button" data-panel="quydinh">Quy định</button>
+        <span class="top-stat"><span id="statSubjects">…</span> môn · <span id="statFaculties">…</span> khoa</span>
+    </div>
+</div>
+<header class="site-head">
+    <div class="container site-head-row">
+        <a class="brand" href="#bang-1" data-panel="bangdiem">
+            <img class="brand-logo" src="{{ url_for('static', filename='ued-logo.png') }}" alt="Biểu trưng Trường Đại học Sư phạm">
+            <span class="brand-text">
+                <span class="brand-uni">ĐẠI HỌC ĐÀ NẴNG</span>
+                <span class="brand-school">TRƯỜNG ĐẠI HỌC SƯ PHẠM</span>
+                <span class="brand-app">Tính điểm</span>
+            </span>
+        </a>
+        <button type="button" class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="siteMenu" aria-label="Mở menu">
+            <span class="menu-bars" aria-hidden="true"><span></span><span></span><span></span></span>
+        </button>
+        <nav class="site-menu" id="siteMenu" aria-label="Mục">
+            <button type="button" data-panel="bangdiem" class="active">Điểm tổng</button>
+            <button type="button" data-panel="diemhp">Điểm học phần</button>
+            <button type="button" data-panel="muctieu">Mục tiêu</button>
+            <button type="button" data-panel="drl">Điểm rèn luyện</button>
+            <button type="button" data-panel="tintuc">Bảng tin</button>
+            <button type="button" data-panel="huongdan">Hướng dẫn</button>
+        </nav>
+    </div>
+</header>
+<main class="container py-4">
+<div id="guideHint" class="guide-hint no-print" hidden>
+    <span>Mới dùng? Mở <button type="button" data-panel="huongdan">Hướng dẫn</button> để xem cách quét bảng điểm và tính CPA.</span>
+    <button type="button" id="dismissGuideHint" aria-label="Đóng gợi ý">×</button>
+</div>
+<section id="panel-bangdiem" class="tool-panel">
+    <div class="row g-3 mb-4">
+        <div class="col-md-4"><div class="card score-box old">
+            <div class="score-label"><i class="fas fa-graduation-cap"></i> GPA hiện tại</div>
+            <div class="score-value" id="displayGPA">0.00</div></div></div>
+        <div class="col-md-4"><div class="card score-box new">
+            <div class="score-label"><i class="fas fa-flask"></i> GPA giả lập</div>
+            <div class="score-value" id="simulatedGPA">0.00</div>
+            <small id="statusText" class="opacity-75" style="font-size:.72rem;">Chưa thay đổi</small></div></div>
+        <div class="col-md-4"><div class="card score-box diff">
+            <div class="score-label"><i class="fas fa-arrows-up-down"></i> Chênh lệch</div>
+            <div class="score-value" id="diffGPA">0.00</div></div></div>
+    </div>
 
-    <div class="container py-5">
-        <div class="text-center mb-5">
-            <h1 style="color: var(--primary); font-weight: 800;">🌸 UED Calculate Grade!</h1>
-            <p class="text-muted">Quản lý điểm số, Gợi ý môn học & Tính ĐRL thông minh</p>
+    <div class="card p-3 mb-4">
+        <div class="d-flex justify-content-between mb-2">
+            <span class="fw-bold small text-ued">TIẾN ĐỘ TỐT NGHIỆP</span>
+            <span class="fw-bold small text-ued d-flex align-items-center gap-2" id="progressText">0 / <input type="number" id="targetCredits" class="form-control form-control-sm d-inline-block" style="width:4.5rem" value="130" min="1"> TC</span>
         </div>
+        <div class="progress"><div id="gradProgressBar" class="progress-bar" role="progressbar" style="width:0%">0%</div></div>
+    </div>
 
-        <div class="row mb-4 g-3">
-            <div class="col-md-4">
-                <div class="card score-box old">
-                    <div class="score-label">GPA HIỆN TẠI</div>
-                    <div class="score-value" id="displayGPA">0.00</div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card score-box new">
-                    <div class="score-label">GPA GIẢ LẬP</div>
-                    <div class="score-value" id="simulatedGPA">0.00</div>
-                    <small id="statusText" class="text-muted" style="font-size: 0.7rem;">Chưa thay đổi</small>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card score-box diff">
-                    <div class="score-label">ĐỘ CHÊNH LỆCH</div>
-                    <div class="score-value" id="diffGPA">0.00</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="card p-3 mb-4 shadow-sm border-0">
-            <div class="d-flex justify-content-between mb-1">
-                <span class="fw-bold text-secondary small">TIẾN ĐỘ TỐT NGHIỆP</span>
-                <span class="fw-bold text-primary small" id="progressText">0 / 130 TC</span>
-            </div>
-            <div class="progress">
-                <div id="gradProgressBar" class="progress-bar progress-bar-striped progress-bar-animated"
-                    role="progressbar" style="width: 0%">0%</div>
-            </div>
-        </div>
-
-        <div class="row g-4">
-            <div class="col-lg-8">
-
-                <div class="card p-4 mb-4 border-primary shadow-sm card-input-section">
-                    <h5 class="fw-bold text-primary mb-3"><i class="fas fa-keyboard"></i> Nhập Môn Học Mới</h5>
-                    <div class="row g-2 align-items-end">
-                        <div class="col-md-5 position-relative">
-                            <label class="small fw-bold text-muted">Tên môn học (Gõ để gợi ý)</label>
-                            <input type="text" id="inputName" class="form-control" placeholder="Ví dụ: Cơ sở..."
-                                onkeyup="searchSubject()" autocomplete="off">
-                            <div id="suggestions" class="suggestions-box"></div>
-                        </div>
-                        <div class="col-md-2">
-                            <label class="small fw-bold text-muted">Tín chỉ</label>
-                            <input type="number" id="inputCredits" class="form-control text-center" value="3" min="1"
-                                max="4"
-                                oninput="if(this.value > 4) this.value = 4; if(this.value < 1 && this.value !== '') this.value = 1;">
-                        </div>
-                        <div class="col-md-2">
-                            <label class="small fw-bold text-muted">Hệ 10</label>
-                            <input type="number" id="inputGrade10" class="form-control text-center" step="0.1" min="0"
-                                max="10" placeholder="8.5" oninput="convertGrade()">
-                        </div>
-                        <div class="col-md-2">
-                            <label class="small fw-bold text-muted">Hệ 4</label>
-                            <input type="text" id="inputGrade4" class="form-control text-center fw-bold text-primary"
-                                readonly placeholder="A">
-                        </div>
-                        <div class="col-md-1">
-                            <button class="btn btn-kanna w-100" onclick="addManualSubject()"><i
-                                    class="fas fa-plus"></i></button>
-                        </div>
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card p-4 mb-4 card-input-section">
+                <h5 class="section-title"><i class="fas fa-keyboard"></i> Nhập môn học</h5>
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label small">Khoa (lọc gợi ý)</label>
+                        <select id="khoaFilter" class="form-select"><option value="">Tất cả các khoa</option></select>
                     </div>
-                </div>
-
-                <div class="card p-4 mb-4">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h6 class="fw-bold text-muted small"><i class="fas fa-camera"></i> Quét ảnh bảng điểm</h6>
-                        <span class="badge bg-warning text-dark" id="ocrLoading" style="display:none;">Đang xử lý... <i
-                                class="fas fa-spinner fa-spin"></i></span>
+                    <div class="col-12 col-md-8 position-relative">
+                        <label class="form-label small">Tên môn / mã học phần (gõ không dấu cũng được)</label>
+                        <input type="text" id="inputName" class="form-control" placeholder="VD: giai tich, Tư tưởng HCM, 31231389..."
+                               onkeyup="searchSubject()" autocomplete="off">
+                        <div id="suggestions" class="suggestions-box"></div>
                     </div>
-
-                    <div class="btn-group w-100 mb-3" role="group">
-                        <input type="radio" class="btn-check" name="ocrMode" id="modeComputer" value="computer" checked>
-                        <label class="btn btn-outline-primary" for="modeComputer"><i class="fas fa-desktop"></i> Ảnh
-                            Portal (Local OCR)</label>
-
-                        <input type="radio" class="btn-check" name="ocrMode" id="modeHand" value="handwriting">
-                        <label class="btn btn-outline-success" for="modeHand"><i class="fas fa-pen-fancy"></i> Ảnh Viết
-                            Tay (Google Vision)</label>
+                    <div class="col-4 col-md-3">
+                        <label class="form-label small">Tín chỉ</label>
+                        <input type="number" id="inputCredits" class="form-control text-center" value="3" min="1" max="15"
+                               oninput="if(this.value > 15) this.value = 15; if(this.value < 1 && this.value !== '') this.value = 1;">
                     </div>
-
-                    <div class="d-flex gap-2">
-                        <input type="file" id="ocrFile" class="form-control" accept="image/*">
-                        <button class="btn btn-dark" onclick="uploadOCR()"><i class="fas fa-magic"></i> Quét
-                            Ngay</button>
+                    <div class="col-4 col-md-3">
+                        <label class="form-label small">Hệ 10</label>
+                        <input type="number" id="inputGrade10" class="form-control text-center" step="0.1" min="0" max="10"
+                               placeholder="8.5" oninput="convertGrade()">
                     </div>
-                </div>
-
-                <div class="card p-4 mb-4">
-                    <div class="d-flex justify-content-between mb-3">
-                        <h5 class="fw-bold text-secondary"><i class="fas fa-list-ul"></i> Bảng Điểm Của Bạn</h5>
-                        <div class="btn-group">
-                            <button class="btn btn-sm btn-outline-primary" onclick="resetSimulation()">🔄 Reset Giả
-                                lập</button>
-                            <button class="btn btn-sm btn-outline-danger" onclick="clearAllData()">🗑️ Xóa hết</button>
-                        </div>
+                    <div class="col-4 col-md-3">
+                        <label class="form-label small">Hệ chữ</label>
+                        <input type="text" id="inputGrade4" class="form-control text-center fw-bold" readonly placeholder="A">
                     </div>
-                    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
-                        <table class="table table-hover align-middle">
-                            <thead class="table-light sticky-top">
-                                <tr>
-                                    <th>Môn học</th>
-                                    <th class="text-center">TC</th>
-                                    <th class="text-center">Điểm</th>
-                                    <th class="text-center" style="width: 140px;">Giả Lập</th>
-                                    <th class="text-center">Xóa</th>
-                                </tr>
-                            </thead>
-                            <tbody id="transcriptTable">
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-lg-4">
-                <div class="card p-3 mb-3 border-primary shadow-sm">
-                    <h5 class="fw-bold text-primary mb-3"><i class="fas fa-calculator"></i> Tính Toán Ra Trường</h5>
-                    <div class="mb-2">
-                        <label class="small fw-bold text-muted">Tổng tín chỉ quy định</label>
-                        <input type="number" id="targetCredits" class="form-control form-control-sm" value="130"
-                            onchange="calculateStats()">
-                    </div>
-                    <div class="mb-2">
-                        <label class="small fw-bold text-muted">Số tín chỉ còn lại</label>
-                        <input type="text" id="remainingCredits" class="form-control form-control-sm bg-white" readonly
-                            value="130">
-                    </div>
-                    <div class="mb-2">
-                        <label class="small fw-bold text-muted">Mục tiêu Xếp loại</label>
-                        <select id="goalGPA" class="form-select form-select-sm">
-                            <option value="3.6">Xuất Sắc (3.6+)</option>
-                            <option value="3.2">Giỏi (3.2+)</option>
-                            <option value="2.5">Khá (2.5+)</option>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label small">Năm học</label>
+                        <select id="inputYear" class="form-select">
+                            <option>2022-2023</option><option>2023-2024</option><option>2024-2025</option>
+                            <option>2025-2026</option><option selected>2026-2027</option><option>2027-2028</option>
                         </select>
                     </div>
-                    <button class="btn btn-primary w-100 btn-sm mb-2" onclick="calculateGraduationPath()">🚀 Tính
-                        toán</button>
-                    <div id="gradResult" class="p-2 rounded text-center small" style="display:none;"></div>
-                </div>
-
-                <div class="card p-3 mb-3 border-success shadow-sm">
-                    <h5 class="fw-bold text-success mb-3"><i class="fas fa-user-graduate"></i> Tính Điểm Rèn Luyện</h5>
-                    <div class="mb-2">
-                        <label class="small text-muted">Mục tiêu cả năm</label>
-                        <select id="drlTarget" class="form-select form-select-sm">
-                            <option value="90">Xuất sắc (90+)</option>
-                            <option value="80">Tốt (80+)</option>
-                            <option value="70">Khá (70+)</option>
-                            <option value="65">TB Khá (65+)</option>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label small">Học kỳ</label>
+                        <select id="inputTerm" class="form-select">
+                            <option value="1">Học kỳ 1</option><option value="2">Học kỳ 2</option><option value="he">Học kỳ hè</option>
                         </select>
                     </div>
-                    <div class="mb-2">
-                        <label class="small text-muted">Điểm ĐRL Kỳ 1</label>
-                        <input type="number" id="drlSem1" class="form-control form-control-sm" placeholder="VD: 85">
+                    <div class="col-6 col-md-2">
+                        <label class="form-label small">Lần học</label>
+                        <input type="number" id="inputAttempt" class="form-control text-center" value="1" min="1" max="6">
                     </div>
-                    <button class="btn btn-success w-100 btn-sm mb-2" onclick="calcDRL()">Tính toán ĐRL</button>
-                    <div id="drlResult" class="alert alert-light border text-center small p-2" style="display:none;">
+                    <div class="col-6 col-md-4 d-flex align-items-end">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="inputPassOnly">
+                            <label class="form-check-label small" for="inputPassOnly">Chỉ đạt/không đạt (P, không vào GPA)</label>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <button class="btn btn-ued w-100" onclick="addManualSubject()"><i class="fas fa-plus"></i> Thêm</button>
                     </div>
                 </div>
+            </div>
 
-                <div class="card p-3 mb-4">
-                    <h6 class="fw-bold text-warning"><i class="fas fa-lightbulb"></i> Nên học lại môn nào?</h6>
-                    <div id="suggestionList" class="d-flex flex-column gap-2 mt-2"></div>
+            <div class="card p-4 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="section-title mb-0"><i class="fas fa-camera"></i> Quét ảnh bảng điểm <button type="button" class="help-q" data-panel="huongdan" data-guide="quet" aria-label="Hướng dẫn quét ảnh">?</button></h5>
+                    <span class="badge badge-gold" id="ocrLoading" style="display:none;">Đang nhận diện… <i class="fas fa-spinner fa-spin"></i></span>
                 </div>
+                <div class="d-flex flex-wrap gap-3 mb-2 small">
+                    <span class="fw-semibold">Đưa kết quả vào</span>
+                    <label class="mb-0"><input type="radio" name="ocrTarget" value="1"> Điểm tổng — điểm đã có</label>
+                    <label class="mb-0"><input type="radio" name="ocrTarget" value="2" checked> Điểm học phần — học kỳ này</label>
+                </div>
+                <div id="ocrQueue" class="small text-ued mb-2" hidden></div>
+                <div class="mode-switch mb-3" role="group">
+                    <input type="radio" class="btn-check" name="ocrMode" id="modeComputer" value="computer" checked>
+                    <label class="btn" for="modeComputer"><i class="fas fa-desktop"></i> Ảnh chụp Portal</label>
+                    <input type="radio" class="btn-check" name="ocrMode" id="modePhone" value="phone">
+                    <label class="btn" for="modePhone"><i class="fas fa-mobile-screen"></i> Ảnh điện thoại</label>
+                    <input type="radio" class="btn-check" name="ocrMode" id="modeHand" value="handwriting">
+                    <label class="btn" for="modeHand"><i class="fas fa-pen-fancy"></i> Ảnh viết tay</label>
+                </div>
+                <label class="dropzone" id="dropzone" for="ocrFile">
+                    <img id="ocrPreview" alt="" style="display:none;">
+                    <div id="dropHint"><i class="fas fa-cloud-arrow-up fa-2x mb-2"></i><br>
+                        Kéo thả ảnh vào đây hoặc <u>chọn ảnh</u><br>
+                        <small class="text-muted">Sau khi chọn ảnh Portal hoặc điện thoại, kéo khung cắt cho còn dòng Học kỳ / Năm học, cả bảng và phần tổng. Ảnh HEIC gửi được; nếu máy không cắt được HEIC thì ảnh gốc được gửi.</small></div>
+                </label>
+                <p id="cropNote" class="small text-ued mt-2 mb-0" hidden></p>
+                <input type="file" id="ocrFile" class="d-none" accept="image/*,.heic,.heif,image/heic,image/heif">
+                <button class="btn btn-ued-dark w-100 mt-3" onclick="uploadOCR()"><i class="fas fa-wand-magic-sparkles"></i> Quét ngay</button>
+                <div id="ocrReview" class="mt-3" style="display:none;"></div>
+            </div>
+
+            <div class="card p-4 mb-4">
+                <div class="d-flex flex-wrap gap-2 justify-content-between mb-3">
+                    <h5 class="section-title mb-0"><i class="fas fa-list-ul"></i> Điểm tổng — điểm tích lũy <button type="button" class="help-q" data-panel="huongdan" data-guide="tong" aria-label="Hướng dẫn Điểm tổng">?</button></h5>
+                    <div class="btn-group flex-wrap">
+                        <button class="btn btn-sm btn-outline-ued" onclick="resetSimulation()">Reset giả lập</button>
+                        <button class="btn btn-sm btn-outline-ued" onclick="exportTranscript()">Xuất JSON</button>
+                        <button class="btn btn-sm btn-outline-ued" onclick="window.print()">In</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="clearAllData()">Xóa hết</button>
+                    </div>
+                </div>
+                <div class="table-scroll table-wide">
+                    <table class="table table-hover align-middle ued-table">
+                        <thead class="sticky-top"><tr>
+                            <th>Môn học</th><th class="text-center">TC</th><th class="text-center">Điểm</th>
+                            <th class="text-center">Học kỳ</th>
+                            <th class="text-center" style="width:130px;">Giả lập học lại</th><th class="text-center">Xóa</th></tr></thead>
+                        <tbody id="transcriptTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card p-3 mb-4">
+                <h5 class="section-title"><i class="fas fa-lightbulb"></i> Nên học lại</h5>
+                <p class="small text-muted">Môn từ 3 tín chỉ trở lên, điểm C, D+, D hoặc F được tô đỏ ở Điểm tổng.</p>
+                <div id="suggestionList" class="d-flex flex-column gap-2 mt-2"></div>
             </div>
         </div>
     </div>
+</section>
 
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+<section id="panel-diemhp" class="tool-panel" hidden>
+    <div class="card p-3 p-md-4 mb-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+            <h5 class="section-title mb-0"><i class="fas fa-table"></i> Điểm học phần <button type="button" class="help-q" data-panel="huongdan" data-guide="hp" aria-label="Hướng dẫn Điểm học phần">?</button></h5>
+            <label class="small mb-0 d-flex align-items-center gap-2">Đang xem
+                <select id="semSelect" class="form-select form-select-sm" style="width:auto;min-width:14rem"></select>
+            </label>
+        </div>
+        <div class="d-flex flex-wrap gap-2 align-items-end mb-2">
+            <div>
+                <label class="form-label small mb-1" for="assignYear">Năm học</label>
+                <select id="assignYear" class="form-select form-select-sm">
+                    <option>2022-2023</option><option>2023-2024</option><option>2024-2025</option>
+                    <option selected>2025-2026</option><option>2026-2027</option><option>2027-2028</option>
+                </select>
+            </div>
+            <div>
+                <label class="form-label small mb-1" for="assignTerm">Học kỳ</label>
+                <select id="assignTerm" class="form-select form-select-sm">
+                    <option value="1">Học kỳ 1</option>
+                    <option value="2" selected>Học kỳ 2</option>
+                    <option value="he">Học kỳ hè</option>
+                </select>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-ued" id="btnAssignTerm">Gán kỳ cho môn đang xem</button>
+        </div>
+        <p class="small text-muted mb-2" id="termHint">Chọn kỳ để xem bảng và để tính mục tiêu học kỳ. Ảnh portal có dòng “Học kỳ / Năm học” sẽ tự gán; nếu không đọc được thì ghi “Không xác định được kỳ/năm”.</p>
+        <div class="position-relative mb-2">
+            <input id="hpSearch" class="form-control form-control-sm" placeholder="Tìm môn học kỳ này, ví dụ Lập trình Java" autocomplete="off">
+            <div id="hpSug" class="suggestions-box"></div>
+            <button type="button" class="btn btn-sm btn-outline-ued mt-1" id="btnAddHp">Thêm môn (chưa có điểm)</button>
+        </div>
+        <div class="row g-2 mb-2 small">
+            <div class="col-4"><label class="form-label small mb-1">Bộ phận / chuyên cần %</label><input id="wBp" class="form-control form-control-sm" type="number" min="0" max="100" value="20"></div>
+            <div class="col-4"><label class="form-label small mb-1">Giữa kỳ %</label><input id="wGk" class="form-control form-control-sm" type="number" min="0" max="100" value="30"></div>
+            <div class="col-4"><label class="form-label small mb-1">Cuối kỳ %</label><input id="wCk" class="form-control form-control-sm" type="number" min="0" max="100" value="50"></div>
+        </div>
+        <div class="table-scroll table-wide">
+            <table class="table table-hover align-middle ued-table mb-0">
+                <thead><tr>
+                    <th>Môn học</th><th class="text-center">TC</th><th class="text-center">Điểm</th>
+                    <th class="text-center hp-term">Học kỳ</th><th class="text-center">Sửa</th><th class="text-center">Xóa</th>
+                </tr></thead>
+                <tbody id="hpBody"></tbody>
+            </table>
+        </div>
+        <div id="courseEditor" class="hp-editor mt-3" hidden>
+            <div class="d-flex justify-content-between align-items-start gap-2">
+                <div>
+                    <div class="hp-kicker">Tính điểm tổng kết môn học</div>
+                    <h6 class="mb-1" id="edTitle"></h6>
+                    <div class="small text-muted" id="edMeta"></div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-danger" id="edClear">Xóa trắng</button>
+            </div>
+            <div class="row g-2 mt-1">
+                <div class="col-6 col-md-3"><div class="hp-field tone-tc"><label>Tín chỉ</label><div id="edTc" class="hp-static"></div></div></div>
+                <div class="col-6 col-md-3"><div class="hp-field tone-bp"><label for="edBp">Điểm bộ phận / chuyên cần</label><input id="edBp" type="number" min="0" max="10" step="0.1" placeholder="0 – 10"></div></div>
+                <div class="col-6 col-md-3"><div class="hp-field tone-gk"><label for="edGk">Điểm giữa kỳ</label><input id="edGk" type="number" min="0" max="10" step="0.1" placeholder="0 – 10"></div></div>
+                <div class="col-6 col-md-3"><div class="hp-field tone-ck"><label for="edCk">Điểm cuối kỳ</label><input id="edCk" type="number" min="0" max="10" step="0.1" placeholder="để trống nếu chưa thi"></div></div>
+            </div>
+            <button type="button" class="btn btn-ued btn-sm mt-2" id="edResult">Xem kết quả</button>
+            <div id="edCurrent" class="mt-2"></div>
+            <div id="edNeeded" class="mt-2"></div>
+        </div>
+        <div class="sem-target mt-3">
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <span class="fw-bold text-ued small">Mục tiêu học kỳ này</span>
+                <select id="semTarget" class="form-select form-select-sm" style="width:auto">
+                    <option value="3.6">Xuất sắc 3,6</option>
+                    <option value="3.2" selected>Giỏi 3,2</option>
+                    <option value="2.5">Khá 2,5</option>
+                </select>
+            </div>
+            <div id="semOptions" class="sem-options"></div>
+        </div>
+    </div>
+</section>
+
+<section id="panel-muctieu" class="tool-panel" hidden>
+    <div class="card p-3 p-md-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
+            <h5 class="section-title mb-0">Mục tiêu CPA <button type="button" class="help-q" data-panel="huongdan" data-guide="cpa" aria-label="Hướng dẫn mục tiêu CPA">?</button></h5>
+            <label class="small mb-0 d-flex align-items-center gap-2">Mốc
+                <select id="solveTarget" class="form-select form-select-sm" style="width:auto">
+                    <option value="3.6">Xuất sắc 3,6</option>
+                    <option value="3.2" selected>Giỏi 3,2</option>
+                    <option value="2.5">Khá 2,5</option>
+                </select>
+            </label>
+        </div>
+        <p class="small text-muted mb-2">Tính từ Điểm tổng và các môn đang học ở học kỳ đang xem. Môn đã có điểm ở cả hai nơi chỉ tính một lần.</p>
+        <div id="solveOut" class="cpa-outlook"></div>
+    </div>
+</section>
+
+<section id="panel-gpa" class="tool-panel" hidden>
+    <div class="card p-4 mb-3">
+        <h5 class="section-title">GPA học kỳ, năm học, tích lũy</h5>
+        <p class="small text-muted mb-2">GPA = tổng (điểm hệ 4 × tín chỉ) / tổng tín chỉ, làm tròn 2 chữ số. P, I, X, R không vào mẫu số. Khóa 2021 trở đi: học phần chưa đạt lấy lần cuối, học phần đã đạt mà học cải thiện thì giữ điểm cao nhất; GPA tích lũy không cộng điểm 0 của môn đang F. Cột năm học chỉ là trung bình tham khảo — QĐ 1586 không đặt công thức GPA năm riêng.</p>
+        <div id="gpaDetail"></div>
+    </div>
+    <div class="card p-4">
+        <h5 class="section-title">Cần bao nhiêu để tới mốc xếp loại</h5>
+        <p class="small text-muted">Phần còn lại = tổng tín chỉ chương trình trừ tín chỉ đã đạt (kể cả học phần P). Điểm các học phần đang F không được giữ — coi như sẽ được thay bằng lần học lại. Đây là mức trung bình hệ 4 trên số tín chỉ còn thiếu, không phải cam kết xét tốt nghiệp.</p>
+        <div id="goalDetail"></div>
+    </div>
+</section>
+
+<section id="panel-drl" class="tool-panel" hidden>
+    <div class="card p-4">
+        <h5 class="section-title">Điểm rèn luyện <button type="button" class="help-q" data-panel="huongdan" data-guide="drl" aria-label="Hướng dẫn điểm rèn luyện">?</button></h5>
+        <p class="small text-muted">Các ý và điểm tối đa lấy từ phiếu tự đánh giá mẫu B01.QT824-02, học kỳ Thu 2025–2026, chấm theo Quyết định 3758/QĐ-ĐHĐN (hướng dẫn Thông tư 16/2015). Xếp loại 90/80/65/50/35 lấy từ Điều 9 thông tư vì phiếu không in lại các mốc đó. Mỗi ô không vượt điểm ghi trên phiếu.</p>
+        <div class="row g-3" id="drlFields">
+            <div class="col-md-6"><label class="form-label small">Ý thức học tập (0–20) · Điều 4</label><input class="form-control" id="drl_hoc_tap" type="number" min="0" max="20" value="0"></div>
+            <div class="col-md-6"><label class="form-label small">Chấp hành nội quy, quy chế (0–25) · Điều 5</label><input class="form-control" id="drl_noi_quy" type="number" min="0" max="25" value="0"></div>
+            <div class="col-md-6"><label class="form-label small">Hoạt động chính trị, xã hội, văn hóa, thể thao (0–20) · Điều 6</label><input class="form-control" id="drl_hoat_dong" type="number" min="0" max="20" value="0"></div>
+            <div class="col-md-6"><label class="form-label small">Ý thức công dân trong cộng đồng (0–25) · Điều 7</label><input class="form-control" id="drl_cong_dan" type="number" min="0" max="25" value="0"></div>
+            <div class="col-md-6"><label class="form-label small">Cán bộ lớp, đoàn thể hoặc thành tích đặc biệt (0–10) · Điều 8</label><input class="form-control" id="drl_can_bo" type="number" min="0" max="10" value="0"></div>
+            <div class="col-md-6"><label class="form-label small">Kỷ luật đang chịu (Điều 10)</label>
+                <select id="drlDiscipline" class="form-select">
+                    <option value="none">Không</option>
+                    <option value="khien_trach">Khiển trách — không xếp quá Khá</option>
+                    <option value="canh_cao">Cảnh cáo — không xếp quá Trung bình</option>
+                    <option value="dinh_chi">Đình chỉ học tập — không đánh giá trong thời gian này</option>
+                    <option value="buoc_thoi_hoc">Buộc thôi học — không đánh giá</option>
+                </select>
+            </div>
+        </div>
+        <button type="button" class="btn btn-gold mt-3" id="btnDrl">Xếp loại</button>
+        <div id="drlOut" class="mt-3"></div>
+        <p class="small text-muted mt-3 mb-0">Điều 9: 90–100 Xuất sắc; 80 đến dưới 90 Tốt; 65 đến dưới 80 Khá; 50 đến dưới 65 Trung bình; 35 đến dưới 50 Yếu; dưới 35 Kém. Hai học kỳ liên tiếp Yếu hoặc Kém thì phải tạm ngừng ít nhất một học kỳ (Điều 12 của thông tư này) — máy tính không tự chấm ý con nên không suy ra điều đó từ một học kỳ.</p>
+    </div>
+</section>
+
+<section id="panel-tintuc" class="tool-panel" hidden>
+    <div class="card p-4 mb-3">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h5 class="section-title mb-0">Bảng tin tuần <button type="button" class="help-q" data-panel="huongdan" data-guide="tin" aria-label="Hướng dẫn bảng tin">?</button></h5>
+            <button type="button" class="btn btn-sm btn-outline-ued" id="btnReloadNews">Tải lại</button>
+        </div>
+        <p class="small text-muted">Lấy bài công khai trên <a href="https://ued.udn.vn/" target="_blank" rel="noopener">ued.udn.vn</a> qua WordPress REST: bài mới và các chuyên mục Thông báo đào tạo, Thông báo người học, Lịch thi, Lịch tuần, Chế độ chính sách. Không có trang quản trị, không bài đăng tay. Cache trên máy chủ khoảng 30 phút; đĩa gói Render free mất khi dịch vụ ngủ hoặc deploy lại, khi đó trang tự tải lại.</p>
+        <div class="news-tabs" id="newsTabs"></div>
+        <div id="newsList" class="mt-3"></div>
+        <p class="small text-muted" id="newsMeta"></p>
+    </div>
+    <div class="row g-3">
+        <div class="col-lg-5">
+            <div class="card p-3">
+                <h5 class="section-title">Lịch rút từ bài viết</h5>
+                <p class="small text-muted">Ngày có dạng dd/mm/yyyy hoặc “ngày … tháng … năm …” đứng gần chữ hạn, đăng ký, thi, nộp. Không bịa ngày nếu bài không ghi đủ.</p>
+                <div id="newsCal"></div>
+            </div>
+        </div>
+        <div class="col-lg-7">
+            <div class="card p-3">
+                <h5 class="section-title">Facebook nhà trường</h5>
+                <p class="small text-muted">Fanpage <a href="https://www.facebook.com/ueddn" target="_blank" rel="noopener">facebook.com/ueddn</a> không trả bài viết đọc được khi chưa đăng nhập, nên không kéo bài. Plugin Page chính thức hiển thị dòng thời gian ngay trong trang.</p>
+                <iframe title="Fanpage Trường Đại học Sư phạm" class="fb-embed" src="https://www.facebook.com/plugins/page.php?href=https%3A%2F%2Fwww.facebook.com%2Fueddn&tabs=timeline&width=500&height=520&small_header=true&adapt_container_width=true&hide_cover=false&show_facepile=false" loading="lazy" allow="encrypted-media"></iframe>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section id="panel-huongdan" class="tool-panel" hidden>
+    <div class="card p-3 p-md-4 mb-3">
+        <h5 class="section-title">Hướng dẫn</h5>
+        <p class="small text-muted mb-0">Mỗi mục nói việc trang làm được và các bước bấm. Bấm dòng để mở. Dấu ? trên từng phần cũng nhảy tới đây.</p>
+    </div>
+    <details class="guide-item" id="guide-quet" open>
+        <summary>Quét ảnh</summary>
+        <div class="guide-body">
+            <p>Lấy bảng điểm trên QLHT, cắt đúng khối học kỳ, rồi đưa ảnh vào trang này. Máy đọc chữ, bạn kiểm tra rồi mới thêm vào bảng.</p>
+            <h6>1. Mở QLHT</h6>
+            <p>Trang đăng nhập sinh viên: <a href="https://qlht.ued.udn.vn/sinhvien" target="_blank" rel="noopener">qlht.ued.udn.vn/sinhvien</a>.</p>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/qlht-1-login.webp') }}" alt="Trang đăng nhập QLHT tại qlht.ued.udn.vn/sinhvien">
+                <figcaption>Bước 1. Mở đúng địa chỉ này. Cột bên phải là thông báo của cổng, không phải bảng điểm.</figcaption>
+            </figure>
+            <h6>2. Đăng nhập</h6>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/qlht-2-login.webp') }}" alt="Ô Mã số đăng nhập, Mật khẩu và nút ĐĂNG NHẬP">
+                <figcaption>Bước 2. Điền <b>Mã số đăng nhập</b> và <b>Mật khẩu</b>, rồi bấm <b>ĐĂNG NHẬP</b>.</figcaption>
+            </figure>
+            <h6>3. Bấm Kết quả học tập</h6>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/qlht-3-menu.webp') }}" alt="Menu sinh viên, icon Kết quả học tập được khoanh">
+                <figcaption>Bước 3. Ở menu icon, bấm <b>Kết quả học tập</b> (khung vàng, số 3). Không bấm Đánh giá học phần.</figcaption>
+            </figure>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/qlht-4-icon.webp') }}" alt="Cận cảnh icon Kết quả học tập">
+                <figcaption>Icon cần bấm: người đứng cạnh máy tính.</figcaption>
+            </figure>
+            <h6>4. Kéo tới khối học kỳ cần lấy</h6>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/qlht-5-table.webp') }}" alt="Bảng điểm Học kỳ 2 năm học 2024-2025">
+                <figcaption>Bước 4. Cuộn tới khối có dòng <b>Học kỳ … Năm học …</b>. Mỗi kỳ là một bảng riêng.</figcaption>
+            </figure>
+            <h6>5. Cắt từ dòng học kỳ tới phần tổng</h6>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/qlht-5-crop.webp') }}" alt="Khung cắt quanh cả bảng điểm và phần tổng">
+                <figcaption>Bước 5. Máy tính: Win+Shift+S (Snipping Tool) hoặc Cmd+Shift+4. Điện thoại: chụp màn hình rồi cắt trong ứng dụng ảnh. Khung đỏ-vàng là vùng giữ lại.</figcaption>
+            </figure>
+            <h6>Cắt đúng và cắt sai</h6>
+            <div class="guide-compare">
+                <figure class="guide-fig">
+                    <img src="{{ url_for('static', filename='guide/crop-dung.webp') }}" alt="Ảnh cắt đúng, còn dòng học kỳ và phần tổng">
+                    <figcaption><span class="tag-ok">Đúng</span> Còn dòng Học kỳ / Năm học, đủ cột, và khối tổng ở dưới.</figcaption>
+                </figure>
+                <figure class="guide-fig">
+                    <img src="{{ url_for('static', filename='guide/crop-sai-header.webp') }}" alt="Ảnh cắt sai vì mất dòng học kỳ">
+                    <figcaption><span class="tag-bad">Sai</span> Mất dòng Học kỳ / Năm học. Trang ghi Không xác định được kỳ/năm.</figcaption>
+                </figure>
+                <figure class="guide-fig">
+                    <img src="{{ url_for('static', filename='guide/crop-sai-cot.webp') }}" alt="Ảnh cắt sai vì mất cột điểm bên phải">
+                    <figcaption><span class="tag-bad">Sai</span> Cụt cột điểm. Môn sẽ thiếu điểm hoặc bị bỏ.</figcaption>
+                </figure>
+                <figure class="guide-fig">
+                    <img src="{{ url_for('static', filename='guide/crop-sai-mo.webp') }}" alt="Ảnh mờ không đọc được">
+                    <figcaption><span class="tag-bad">Sai</span> Mờ hoặc lóa. Chụp lại, màn hình thẳng và đủ sáng.</figcaption>
+                </figure>
+            </div>
+            <h6>6. Cắt lại trên trang này, rồi quét</h6>
+            <ol>
+                <li>Chọn <b>Ảnh chụp Portal</b> nếu ảnh màn hình máy tính đã rõ. Chọn <b>Ảnh điện thoại</b> nếu là ảnh chụp màn hình điện thoại hoặc ảnh máy chụp màn hình. <b>Ảnh viết tay</b> chỉ dùng cho giấy viết tay, và không mở khung cắt.</li>
+                <li>Chọn ảnh. Khung cắt hiện ra: kéo vùng, kéo góc, <b>Xoay 90°</b>, thanh <b>Nắn</b>, thanh <b>Phóng</b>. Trên điện thoại có thể kéo và chụm hai ngón. <b>Đặt lại</b> về gợi ý ban đầu. <b>Hủy</b> bỏ ảnh này.</li>
+                <li>Bấm <b>Xác nhận ảnh</b>. Ảnh đã cắt hiện trong ô. Xem lại, rồi bấm <b>Quét ngay</b> — lúc đó ảnh mới được gửi.</li>
+                <li>Đợi hàng. Mỗi lúc một ảnh. Trang ghi vị trí và số giây (lần đầu khoảng 24 giây). Mỗi máy 5 ảnh mỗi phút, 30 ảnh mỗi giờ. Hàng đầy 20 ảnh thì đợi.</li>
+                <li>Kiểm tra từng dòng. Dưới 55% khớp thì bỏ chọn sẵn. Nếu ảnh không phải bảng điểm, trang báo không thấy bảng điểm.</li>
+            </ol>
+            <div class="guide-steps">
+                <figure class="guide-fig">
+                    <img src="{{ url_for('static', filename='guide/app-crop.webp') }}" alt="Khung cắt ảnh trên trang tính điểm">
+                    <figcaption>Khung cắt: vùng vàng, xoay, nắn, phóng, rồi Xác nhận ảnh.</figcaption>
+                </figure>
+                <figure class="guide-fig">
+                    <img src="{{ url_for('static', filename='guide/app-preview.webp') }}" alt="Ảnh đã cắt và nút Quét ngay">
+                    <figcaption>Xem ảnh đã cắt. Bấm Quét ngay mới gửi.</figcaption>
+                </figure>
+                <figure class="guide-fig">
+                    <img src="{{ url_for('static', filename='guide/app-review.webp') }}" alt="Bảng kiểm tra môn trước khi thêm">
+                    <figcaption>Giữ dòng đúng, bỏ dòng sai, rồi thêm vào bảng.</figcaption>
+                </figure>
+                <figure class="guide-fig">
+                    <img src="{{ url_for('static', filename='guide/app-diemhp.webp') }}" alt="Điểm học phần sau khi quét">
+                    <figcaption>Mọi môn của kỳ, kể cả môn chưa có điểm, vào Điểm học phần.</figcaption>
+                </figure>
+            </div>
+            <p>Có dòng học kỳ và năm học thì môn vào đúng kỳ. Thiếu dòng thì kỳ ghi <b>Không xác định được kỳ/năm</b>. Sang Điểm học phần, chọn năm và học kỳ rồi bấm <b>Gán kỳ cho môn đang xem</b>.</p>
+            <p>Môn đã có điểm chữ còn được chép sang Điểm tổng. Môn chưa có điểm chỉ ở Điểm học phần. Ảnh trên máy chủ bị xóa sau khi đọc. Ảnh HEIC mà máy chủ không mở được sẽ có câu hướng dẫn xuất JPEG.</p>
+        </div>
+    </details>
+    <details class="guide-item" id="guide-tong">
+        <summary>Điểm tổng</summary>
+        <div class="guide-body">
+            <p>Bảng điểm các môn đã có điểm, dùng để xem CPA và thử học lại. Số trên ảnh khớp với các bước bên dưới.</p>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/app-tong.webp') }}" alt="Điểm tổng với các bước được đánh số">
+                <figcaption>Điểm tổng: thêm môn, ba ô CPA, cột giả lập, thanh tín chỉ, và các nút xuất / in / xóa.</figcaption>
+            </figure>
+            <ol>
+                <li>Thêm tay: chọn khoa nếu muốn lọc, gõ tên hoặc mã, chọn môn trong gợi ý, nhập tín chỉ và điểm hệ 10 (ô hệ chữ tự đổi), chọn năm học, học kỳ, lần học. Dấu “chỉ đạt/không đạt” là điểm P, không vào CPA.</li>
+                <li>Ba ô trên cùng là CPA đang có, CPA giả lập, và chênh lệch. Cột <b>Giả lập học lại</b> đổi điểm tạm để xem CPA mới, không xóa điểm thật. <b>Reset giả lập</b> trả các ô về Giữ.</li>
+                <li>Môn từ 3 tín chỉ, điểm C, D+, D hoặc F được tô đỏ.</li>
+                <li>Thanh tiến độ dùng ô tổng tín chỉ (mặc định 130, bạn sửa nếu chương trình khác).</li>
+                <li><b>Xuất JSON</b> tải file danh sách môn. <b>In</b> in trang. <b>Xóa hết</b> xóa Điểm tổng trên trình duyệt này, sau khi hỏi lại. Không xóa Điểm học phần.</li>
+            </ol>
+        </div>
+    </details>
+    <details class="guide-item" id="guide-hp">
+        <summary>Điểm học phần</summary>
+        <div class="guide-body">
+            <p>Bảng một học kỳ: môn đã có điểm và môn đang học.</p>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/app-hp.webp') }}" alt="Điểm học phần, ô Đang xem và trọng số">
+                <figcaption>1 Đang xem. 2 Thêm môn chưa có điểm. 3 Trọng số 20 / 30 / 50.</figcaption>
+            </figure>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/app-sua.webp') }}" alt="Form Sửa với điểm bộ phận, giữa kỳ và điểm cuối kỳ cần đạt">
+                <figcaption>4 Bấm Sửa. Nhập bộ phận và giữa kỳ, để trống cuối kỳ để xem mức cần đạt từng chữ.</figcaption>
+            </figure>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/app-plans.webp') }}" alt="Danh sách phương án mục tiêu học kỳ">
+                <figcaption>5 Chọn mốc. Trang liệt kê tối đa 5 cách xếp chữ, cách dễ trước.</figcaption>
+            </figure>
+            <ol>
+                <li><b>Đang xem</b> liệt kê các kỳ đã có môn. Đổi năm học hoặc học kỳ bên trái cũng chuyển kỳ đang xem.</li>
+                <li>Thêm môn chưa có điểm: gõ tên, chọn gợi ý, bấm <b>Thêm môn (chưa có điểm)</b>. Môn vào kỳ đang xem.</li>
+                <li>Ba ô phần trăm là trọng số bộ phận, giữa kỳ, cuối kỳ. Mặc định 20, 30, 50. Đổi nếu đề cương môn khác. Tổng nên bằng 100.</li>
+                <li>Bấm <b>Sửa</b> trên một dòng. Nhập điểm bộ phận và giữa kỳ, để trống cuối kỳ nếu chưa thi. Bảng dưới liệt kê điểm cuối kỳ tối thiểu cho từng chữ A+ đến D. Ô nào ghi không đạt (&gt;10) là mức đó không với tới. <b>Xem kết quả</b> khi đã có đủ ba cột. <b>Xóa trắng</b> xóa ba ô thành phần.</li>
+                <li>Phía dưới, chọn mốc Xuất sắc 3,6 / Giỏi 3,2 / Khá 2,5. Trang liệt kê tối đa 5 phương án chữ cho các môn đang chờ cuối kỳ, cách dễ trước. Đổi mốc thì chỉ danh sách này đổi.</li>
+            </ol>
+        </div>
+    </details>
+    <details class="guide-item" id="guide-cpa">
+        <summary>Mục tiêu CPA</summary>
+        <div class="guide-body">
+            <p>Xem CPA từ Điểm tổng cộng với các môn đang học của kỳ đang xem. Môn đã có điểm ở cả hai nơi chỉ tính một lần.</p>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/app-cpa.webp') }}" alt="Thẻ mục tiêu CPA với CPA hiện tại, tín chỉ, mốc và phần thiếu">
+                <figcaption>Đổi mốc là trang tính lại ngay: CPA, tín chỉ, mốc, phần thiếu hoặc vượt, và thanh tiến độ.</figcaption>
+            </figure>
+            <ol>
+                <li>Chọn mốc. Trang tính ngay, không cần bấm thêm.</li>
+                <li>Bốn ô: CPA hiện tại, số tín chỉ đang tính, mốc, và thiếu hoặc vượt bao nhiêu. Thanh phía dưới là CPA so với mốc.</li>
+                <li>Nếu kỳ đang xem còn môn chưa có điểm cuối, trang đưa tối đa 5 cách xếp chữ để tới mốc. Nếu điểm cao nhất các môn đó vẫn không tới, trang nói CPA cao nhất đạt được.</li>
+                <li>Nếu không còn môn đang học, trang ước lượng cần thêm bao nhiêu tín chỉ điểm A (4,0) hoặc B+ (3,5). B+ không được nêu khi 3,5 thấp hơn mốc. Nếu đã vượt mốc, trang nói còn thêm được bao nhiêu tín chỉ điểm B hoặc C trước khi tụt xuống.</li>
+            </ol>
+            <p>Hạng xuất sắc hoặc giỏi bị hạ một bậc chỉ khi tín chỉ học từ lần 2 trở đi vượt 5% tổng tín chỉ chương trình (ô trên Điểm tổng, mặc định 130). Đó là QĐ 1586 Điều 13 và QĐ 1473 Điều 25. Chưa đủ điều kiện thì trang không nhắc.</p>
+        </div>
+    </details>
+    <details class="guide-item" id="guide-drl">
+        <summary>Điểm rèn luyện</summary>
+        <div class="guide-body">
+            <p>Cộng điểm phiếu tự đánh giá. Các ý và điểm tối đa lấy từ mẫu B01.QT824-02, học kỳ Thu 2025–2026, theo Quyết định 3758/QĐ-ĐHĐN (hướng dẫn Thông tư 16/2015).</p>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/app-drl.webp') }}" alt="Phiếu điểm rèn luyện và nút Xếp loại">
+                <figcaption>Nhập từng ý, chọn kỷ luật nếu có, rồi bấm Xếp loại.</figcaption>
+            </figure>
+            <ol>
+                <li>Nhập từng ý, không quá điểm ghi bên cạnh. Ý ĐTBCHK chỉ chọn một mức.</li>
+                <li>Chọn kỷ luật đang chịu, nếu có. Khiển trách không xếp quá Khá, cảnh cáo không xếp quá Trung bình, đình chỉ hoặc buộc thôi học thì không đánh giá.</li>
+                <li>Bấm <b>Xếp loại</b>. Mốc: 90 xuất sắc, 80 tốt, 65 khá, 50 trung bình, 35 yếu, dưới 35 kém (Điều 9 thông tư).</li>
+            </ol>
+            <p>Số bạn gõ không được lưu. Tải lại trang là mất. Trang không tự kết luận “hai kỳ liên tiếp yếu” vì chỉ có một lần chấm.</p>
+        </div>
+    </details>
+    <details class="guide-item" id="guide-tin">
+        <summary>Bảng tin</summary>
+        <div class="guide-body">
+            <p>Tin công khai trên ued.udn.vn. Không có chỗ đăng bài trên trang này.</p>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/app-tin.webp') }}" alt="Bảng tin với các nhóm và nút Tải lại">
+                <figcaption>Các nhóm bài, nút Tải lại, và lịch chỉ khi bài ghi đủ ngày.</figcaption>
+            </figure>
+            <ol>
+                <li>Mở tab Bảng tin. Bài được kéo về và chia nhóm (tất cả, thạc sĩ, học tập, tiếng Anh, quốc phòng, học bổng, khác).</li>
+                <li>Bấm tiêu đề để mở bài gốc. <b>Tải lại</b> xin bản mới.</li>
+                <li>Ô lịch chỉ lấy ngày viết đủ kiểu ngày/tháng/năm đứng gần chữ hạn, đăng ký, thi, nộp. Bài không ghi đủ ngày thì không có mục.</li>
+                <li>Khung Facebook là trang nhà trường nhúng sẵn. Trang không đọc được bài fanpage khi bạn chưa đăng nhập Facebook.</li>
+            </ol>
+            <p>Máy chủ giữ bản tin khoảng 30 phút. Bản trên đĩa mất khi dịch vụ ngủ hoặc được đưa bản mới lên, khi đó trang tải lại.</p>
+        </div>
+    </details>
+    <details class="guide-item" id="guide-tinh">
+        <summary>Cách tính điểm</summary>
+        <div class="guide-body">
+            <p>Các số dưới đây là cách trang đang tính, không phải toàn bộ quy chế.</p>
+            <h6>Điểm một học phần</h6>
+            <p>Điểm hệ 10 = làm tròn 1 chữ số của BP × w1 + GK × w2 + CK × w3. Mặc định 20%, 30%, 50%. Ba ô không đủ 100 thì trang chia lại theo tỷ lệ vừa nhập. Làm tròn nửa đơn vị lên (8,25 thành 8,3) rồi mới đổi chữ.</p>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/calc-scale.webp') }}" alt="Công thức điểm thành phần và bảng quy đổi hệ 10 sang chữ và hệ 4">
+                <figcaption>Thang chữ ô nhập và Điểm học phần đang dùng. A+ và A cùng 4,0.</figcaption>
+            </figure>
+            <p>QĐ 1473 cho khóa 2020 trở về trước không có A+ và B+: A từ 8,5 là 4, B từ 7,0 là 3, C từ 5,5 là 2, D từ 4,0 là 1, dưới 4 là F. Ô chữ trên trang này vẫn theo thang có A+ và B+.</p>
+            <h6>CPA</h6>
+            <p>CPA = tổng (điểm hệ 4 × tín chỉ) chia tổng tín chỉ của các môn có chữ, làm tròn 2 số. Môn chưa có chữ không vào mẫu số. Điểm P (ô chỉ đạt / không đạt) không vào CPA trên thẻ Mục tiêu và không vào ô CPA của Điểm tổng. F = 0 vẫn ở trong mẫu số.</p>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/calc-example.webp') }}" alt="Ví dụ CPA 3,81 của học kỳ 2 năm 2024-2025">
+                <figcaption>Ảnh mẫu Học kỳ 2, 2024-2025: 80 / 21 = 3,81. Giáo dục thể chất 4 chưa có điểm nên đứng ngoài phép chia.</figcaption>
+            </figure>
+            <p>Trang không loại Giáo dục thể chất hay Giáo dục quốc phòng chỉ vì tên môn. Môn nào có chữ thì được tính. Dòng “tổng số tín chỉ học kỳ 22,00” trên portal vẫn cộng môn đang học; CPA 3,81 thì không.</p>
+            <p>Mỗi dòng đang nằm trong Điểm tổng được cộng riêng. Ghi thêm lần 2 không tự xóa lần 1. Muốn chỉ giữ lần học lại thì sửa hoặc xóa dòng cũ. Quy chế ở mục Quy định nói khác: QĐ 1586 lấy lần cuối nếu chưa đạt và lấy điểm cao hơn nếu đã đạt rồi học cải thiện; QĐ 1473 lấy lần cao nhất. Hai ô CPA trên trang không tự áp quy tắc đó.</p>
+            <h6>Mốc trên trang</h6>
+            <p>Ô mục tiêu có ba mốc: Xuất sắc 3,60, Giỏi 3,20, Khá 2,50. Hạng tốt nghiệp trong mã nguồn còn Trung bình từ 2,00; dưới 2,00 không có hạng tốt nghiệp. Hạng xuất sắc hoặc giỏi bị nhắc hạ một bậc chỉ khi tín chỉ từ lần 2 trở đi vượt 5% tổng tín chỉ chương trình (ô trên Điểm tổng, mặc định 130).</p>
+        </div>
+    </details>
+    <details class="guide-item" id="guide-data">
+        <summary>Dữ liệu nằm ở đâu, xóa thế nào</summary>
+        <div class="guide-body">
+            <p>Điểm tổng, Điểm học phần và trọng số 20/30/50 nằm trong trình duyệt này (localStorage), không gửi lên tài khoản. Máy khác hoặc trình duyệt khác không thấy. Xóa dữ liệu trang web của trình duyệt là mất hết.</p>
+            <ul>
+                <li>Điểm tổng: nút <b>Xóa hết</b>. Hỏi lại trước khi xóa.</li>
+                <li>Cột giả lập: <b>Reset giả lập</b>.</li>
+                <li>Điểm học phần: nút × trên từng dòng. Không có một nút xóa cả kỳ.</li>
+                <li>Điểm rèn luyện: không lưu.</li>
+                <li>Ảnh vừa quét: máy chủ xóa file sau khi đọc.</li>
+                <li>Danh sách môn để gõ tìm: nằm trên máy chủ, lấy từ CTĐT đã đưa vào trang.</li>
+                <li>Bảng tin: bản nhớ tạm trên máy chủ, khoảng 30 phút.</li>
+            </ul>
+        </div>
+    </details>
+    <details class="guide-item" id="guide-scale">
+        <summary>Thang điểm và nguồn</summary>
+        <div class="guide-body">
+            <p>Chữ dùng trong bảng, theo Quyết định 1586 (khóa 2021 trở đi): A+ từ 9,5 và A từ 8,5 đều 4,0; B+ từ 8,0 là 3,5; B từ 7,0 là 3,0; C+ từ 6,5 là 2,5; C từ 5,5 là 2,0; D+ từ 5,0 là 1,5; D từ 4,0 là 1,0; dưới 4,0 là F = 0. CPA làm tròn 2 chữ số. P không vào CPA.</p>
+            <p>Chân trang ghi nguồn môn là CTĐT khóa 2025 trên ued.udn.vn, nguồn điểm là Thông tư 08/2021 và QĐ 1473/QĐ-ĐHSP-ĐT. QĐ 1473 (khóa 2020 trở về trước) không có A+ và B+. Phần <button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-panel="quydinh">Quy định</button> trên thanh xanh liệt kê điều đã đối chiếu và chỗ chưa đọc được toàn văn, không dùng làm ngưỡng.</p>
+        </div>
+    </details>
+</section>
+
+<section id="panel-quydinh" class="tool-panel" hidden>
+    <div class="card p-4">
+        <h5 class="section-title">Nguồn đã đối chiếu</h5>
+        <ul class="small">
+            <li><a href="https://vanban.chinhphu.vn/default.aspx?docid=203159&pageid=27160" target="_blank" rel="noopener">Thông tư 08/2021/TT-BGDĐT</a> — thang A 8,5–10 = 4; B 7,0–8,4 = 3; C 5,5–6,9 = 2; D 4,0–5,4 = 1; F dưới 4 = 0 (Điều 9, Điều 10). Xếp loại học lực Điều 10.5. Cảnh báo học tập Điều 11. Hạng tốt nghiệp và hạ một bậc Điều 14. Phòng Đào tạo UED ghi quy chế này <a href="https://daotao.ued.udn.vn/quy-dinh-ve-dao-tao/" target="_blank" rel="noopener">áp dụng từ khóa 2021</a>.</li>
+            <li><a href="https://daotao.ued.udn.vn/quyet-dinh-442-qd-dhsp-dt-ve-viec-ban-hanh-quy-dinh-dao-tao-trinh-do-dai-hoc-va-cao-dang-he-chinh-quy-theo-he-thong-tin-chi/" target="_blank" rel="noopener">Quyết định 1473/QĐ-ĐHSP-ĐT</a> — cùng thang chữ; trọng số 0,1 + 0,1 + 0,3 + 0,5 (Điều 19); GPA tích lũy lấy lần cao nhất (Điều 21); cảnh báo 0,8/1,0 và 1,2/1,4/1,6/1,8 (Điều 16); buộc thôi học ở lần cảnh báo thứ 3; hạ bậc khi học từ lần 2 vượt 5% (Điều 25). Áp dụng khóa 2020 trở về trước.</li>
+            <li><a href="https://congbao.chinhphu.vn/van-ban/thong-tu-so-16-2015-tt-bgddt-16264/11141.htm" target="_blank" rel="noopener">Thông tư 16/2015/TT-BGDĐT</a> — khung điểm rèn luyện Điều 4–8 và phân loại Điều 9–10.</li>
+        </ul>
+        <h6 class="fw-bold text-ued">Chưa kiểm chứng — không dùng làm ngưỡng</h6>
+        <ul class="small">
+            <li>Toàn văn Quyết định 1498/QĐ-ĐHSP ngày 31/7/2025 (sửa đổi, áp dụng từ khóa 2025) mới thấy tên trên trang Phòng Đào tạo, chưa đọc được điều khoản. Những chỗ 1498 có thể sửa (số lần cảnh báo, học cải thiện) được ghi chú trong kết quả, không bịa số.</li>
+            <li><a href="https://daotao.ued.udn.vn/wp-content/uploads/2018/02/2021-930_QD1586-QuyDinh-DaoTao-TrinhDo-DaiHoc.pdf" target="_blank" rel="noopener">Quyết định 1586/QĐ-ĐHSP ngày 30/9/2021</a> — thang A+ đến F và quy tắc học lại/cải thiện cho khóa 2021 trở đi. <a href="https://daotao.ued.udn.vn/quy-dinh-ve-dao-tao/" target="_blank" rel="noopener">Quyết định 1498/QĐ-ĐHSP ngày 31/7/2025</a> sửa một số điều cho khóa 2025; toàn văn các điều sửa được ghi trong <code>docs/quy-che-nguon.md</code>. Mốc năm của chương trình 11 học kỳ chưa đưa vào máy tính.</li>
+            <li>Trang đào tạo có mục “điều chỉnh tổng số tín chỉ tích lũy lên 135”, chưa đọc được phạm vi áp dụng. Ô tổng tín chỉ mặc định 130 theo Điều 2 và Điều 24 QĐ 1473; bạn sửa nếu chương trình của khóa mình khác.</li>
+            <li>Mốc năm học 34/65/99 tín chỉ là của QĐ 1473 Điều 15. Khóa 2021+ dùng cách chia N/M của Thông tư 08 Điều 10.6 (M mặc định = tổng tín chỉ / 4).</li>
+            <li>Chưa có biểu mẫu điểm rèn luyện chi tiết của riêng UED trong các trang đã mở.</li>
+        </ul>
+        <p class="small mb-0">Chi tiết trích dẫn nằm trong <code>docs/quy-che-nguon.md</code> của mã nguồn.</p>
+    </div>
+</section>
+</main>
+<footer class="ued-footer text-center py-3 small">
+    Môn học: <a href="https://ued.udn.vn/2025/11/09/chuong-trinh-dao-tao-ke-hoach-dao-tao-ap-dung-cho-khoa-ts-2025/" target="_blank" rel="noopener">CTĐT khóa 2025, ued.udn.vn</a>
+    · Điểm: Thông tư 08/2021 và QĐ 1473/QĐ-ĐHSP-ĐT
+    · Bảng tin: bài công khai ued.udn.vn
+</footer>
+<div id="cropModal" class="crop-modal" hidden>
+    <div class="crop-sheet" role="dialog" aria-modal="true" aria-labelledby="cropTitle">
+        <h5 id="cropTitle" class="section-title mb-1">Cắt ảnh trước khi quét</h5>
+        <p class="small text-muted mb-2">Kéo khung vàng, kéo góc để đổi cỡ. Giữ dòng Học kỳ / Năm học, cả bảng và phần tổng.</p>
+        <div id="cropStage" class="crop-stage">
+            <canvas id="cropCanvas"></canvas>
+            <div id="cropBox">
+                <i data-h="nw"></i><i data-h="n"></i><i data-h="ne"></i><i data-h="e"></i>
+                <i data-h="se"></i><i data-h="s"></i><i data-h="sw"></i><i data-h="w"></i>
+            </div>
+        </div>
+        <div class="crop-tools">
+            <button type="button" class="btn btn-outline-ued btn-sm" id="cropRot">Xoay 90°</button>
+            <label>Nắn <input id="cropStraight" type="range" min="-8" max="8" step="0.1" value="0" aria-label="Nắn thẳng"></label>
+            <label>Phóng <input id="cropZoom" type="range" min="1" max="4" step="0.05" value="1" aria-label="Phóng to"></label>
+            <button type="button" class="btn btn-outline-ued btn-sm" id="cropReset">Đặt lại</button>
+        </div>
+        <div class="crop-actions">
+            <button type="button" class="btn btn-outline-secondary" id="cropCancel">Hủy</button>
+            <button type="button" class="btn btn-ued" id="cropOk">Xác nhận ảnh</button>
+        </div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='crop.js') }}"></script>
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+<script src="{{ url_for('static', filename='boards.js') }}"></script>
+<script src="{{ url_for('static', filename='academics-ui.js') }}"></script>
 </body>
-
 </html>
