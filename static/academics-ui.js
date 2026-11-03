@@ -142,6 +142,7 @@
                 <div class="col-4 col-md-3"><div class="form-check"><input class="form-check-input part-exam" type="radio" name="examCol" ${p.exam ? 'checked' : ''}><label class="form-check-label small">Là điểm thi</label></div></div>
             </div>`).join('');
     }
+    if ($('btnPreset1586') && $('partRows')) {
     $('btnPreset1586').addEventListener('click', () => partEditor(PRESET_1586));
     $('btnPreset1473').addEventListener('click', () => partEditor(PRESET_1473));
     $('btnPresetBlank').addEventListener('click', () => partEditor([
@@ -171,6 +172,7 @@
             out.innerHTML = `<div class="text-danger small">${escape(err.message)}</div>`;
         }
     });
+    }
 
     const DRL_GROUPS = [
         ['hoc_tap', 'I. Ý thức học tập (20)', [['Đi học chuyên cần, đúng giờ, đủ điều kiện dự thi', 4], ['Câu lạc bộ học thuật, ngoại khóa', 2], ['NCKH hoặc thi sinh viên giỏi', 2], ['Không vi phạm quy chế thi, kiểm tra', 6], ['Lớp công nhận tinh thần vượt khó', 2]]],
@@ -245,7 +247,8 @@
     $('btnReloadNews').addEventListener('click', () => { newsCache = null; loadNews(); });
 
     ['ruleSelect', 'targetCredits', 'disciplineFlag'].forEach(id => {
-        $(id).addEventListener('change', () => window.refreshAcademics());
+        const el = $(id);
+        if (el) el.addEventListener('change', () => window.refreshAcademics());
     });
     window.refreshAcademics();
 })();

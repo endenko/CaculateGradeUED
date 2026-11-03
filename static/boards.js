@@ -71,43 +71,36 @@
     }
 
     function paint() {
-        const mount = document.getElementById('boardsMount');
+        const mount = document.getElementById('bang2Mount');
         if (!mount) return;
+        const keepTarget = (document.getElementById('solveTarget') || {}).value;
+        const keepScope = (document.getElementById('solveScope') || {}).value;
         const w = weights();
-        const cpa1 = cpa(t1.filter(c => c.points != null).map(effective1));
-        const credits1 = t1.reduce((s, c) => s + (Number(c.tin_chi) || 0), 0);
-        const simCpa = cpa(t1.filter(c => (c.sim ? POINTS[c.sim_letter] != null : c.points != null)).map(effective1));
+        const empty2 = '<tr><td colspan="4" class="small text-muted">Chưa có môn. Tìm trong cơ sở dữ liệu hoặc quét ảnh và chọn Bảng 2.</td></tr>';
         mount.innerHTML = `
-        <div class="board-tabs">
-            <button type="button" class="nav-pill active" data-board="1">Bảng 1 — các kỳ trước</button>
-            <button type="button" class="nav-pill" data-board="2">Bảng 2 — học kỳ này</button>
-        </div>
-        <div class="row g-3">
-          <div class="col-lg-6 board-col active" data-board="1">
-            <div class="card p-3 h-100">
-              <h5 class="section-title">Bảng 1 — tích lũy các kỳ trước</h5>
-              <p class="small mb-2">Tổng <b>${credits1}</b> tín chỉ · CPA <b>${cpa1 == null ? '—' : cpa1.toFixed(2)}</b>
-                · CPA giả lập <b>${simCpa == null ? '—' : simCpa.toFixed(2)}</b></p>
-              ${searchBox(1)}
-              <div class="table-responsive"><table class="table table-sm align-middle ued-table">
-                <thead><tr><th>Môn</th><th>TC</th><th>Điểm</th><th>Giả lập học lại</th><th></th></tr></thead>
-                <tbody>${t1.map(row1).join('') || '<tr><td colspan="5" class="small text-muted">Chưa có môn.</td></tr>'}</tbody>
+        <div class="row g-3 align-items-start">
+          <div class="col-lg-5">
+            <div class="card p-3 mb-0">
+              <h5 class="section-title">Bảng 2 — học kỳ hiện tại</h5>
+              ${searchBox(2)}
+              <div class="table-responsive"><table class="table table-sm align-middle ued-table mb-0">
+                <thead><tr><th>Môn</th><th class="text-center">TC</th><th class="text-center">Chữ</th><th></th></tr></thead>
+                <tbody>${t2.map(row2List).join('') || empty2}</tbody>
               </table></div>
             </div>
           </div>
-          <div class="col-lg-6 board-col" data-board="2">
-            <div class="card p-3 h-100">
-              <h5 class="section-title">Bảng 2 — học kỳ hiện tại</h5>
+          <div class="col-lg-7">
+            <div class="card p-3 mb-0">
+              <h5 class="section-title">Điểm học phần</h5>
               <div class="row g-2 mb-2 small">
-                <div class="col-4"><label>BP / chuyên cần %</label><input id="wBp" class="form-control form-control-sm" type="number" min="0" max="100" value="${esc(savedWeight('wBp', 20))}"></div>
-                <div class="col-4"><label>GK %</label><input id="wGk" class="form-control form-control-sm" type="number" min="0" max="100" value="${esc(savedWeight('wGk', 30))}"></div>
-                <div class="col-4"><label>CK %</label><input id="wCk" class="form-control form-control-sm" type="number" min="0" max="100" value="${esc(savedWeight('wCk', 50))}"></div>
+                <div class="col-4"><label class="form-label small mb-1">BP / chuyên cần %</label><input id="wBp" class="form-control form-control-sm" type="number" min="0" max="100" value="${esc(savedWeight('wBp', 20))}"></div>
+                <div class="col-4"><label class="form-label small mb-1">GK %</label><input id="wGk" class="form-control form-control-sm" type="number" min="0" max="100" value="${esc(savedWeight('wGk', 30))}"></div>
+                <div class="col-4"><label class="form-label small mb-1">CK %</label><input id="wCk" class="form-control form-control-sm" type="number" min="0" max="100" value="${esc(savedWeight('wCk', 50))}"></div>
               </div>
-              <p class="small text-muted">Điểm học phần = BP×${w[0].toFixed(2)} + GK×${w[1].toFixed(2)} + CK×${w[2].toFixed(2)}, làm tròn 1 số rồi xếp chữ QĐ 1586.</p>
-              ${searchBox(2)}
-              <div class="table-responsive"><table class="table table-sm align-middle ued-table">
-                <thead><tr><th>Môn</th><th>TC</th><th>BP</th><th>GK</th><th>CK</th><th>Chữ</th><th></th></tr></thead>
-                <tbody>${t2.map(row2).join('') || '<tr><td colspan="7" class="small text-muted">Chưa có môn.</td></tr>'}</tbody>
+              <p class="small text-muted mb-2">Điểm học phần = BP×${w[0].toFixed(2)} + GK×${w[1].toFixed(2)} + CK×${w[2].toFixed(2)}, làm tròn 1 số rồi xếp chữ theo QĐ 1586.</p>
+              <div class="table-responsive"><table class="table table-sm align-middle ued-table mb-0">
+                <thead><tr><th>Môn</th><th>BP</th><th>GK</th><th>CK</th><th class="text-center">Điểm</th><th class="text-center">Chữ</th><th class="text-center">Hệ 4</th></tr></thead>
+                <tbody>${t2.map(row2Parts).join('') || '<tr><td colspan="7" class="small text-muted">Thêm môn ở Bảng 2 để nhập điểm thành phần.</td></tr>'}</tbody>
               </table></div>
             </div>
           </div>
@@ -131,15 +124,8 @@
           <div id="solveOut" class="small mt-3"></div>
         </div>`;
         bind(mount);
-        const g1 = document.getElementById('displayGPA');
-        const g2 = document.getElementById('simulatedGPA');
-        if (g1) g1.textContent = cpa1 == null ? '—' : cpa1.toFixed(2);
-        if (g2) g2.textContent = simCpa == null ? '—' : simCpa.toFixed(2);
-        const diff = document.getElementById('diffGPA');
-        if (diff && cpa1 != null && simCpa != null) {
-            const d = round2(simCpa - cpa1);
-            diff.textContent = (d > 0 ? '+' : '') + d.toFixed(2);
-        }
+        if (keepTarget && document.getElementById('solveTarget')) document.getElementById('solveTarget').value = keepTarget;
+        if (keepScope && document.getElementById('solveScope')) document.getElementById('solveScope').value = keepScope;
     }
     function savedWeight(key, fallback) {
         return localStorage.getItem(key) || fallback;
@@ -159,11 +145,17 @@
             <select class="form-select form-select-sm mt-1" data-simletter="${c.id}">${opts}</select></td>
             <td><button class="btn btn-sm btn-outline-danger" data-del1="${c.id}">×</button></td></tr>`;
     }
-    function row2(c) {
-        const shown = c.letter ? `<b>${esc(c.letter)}</b>` : '';
-        return `<tr><td>${esc(c.ten_mon)}</td><td>${c.tin_chi}</td>
-            ${['bp', 'gk', 'ck'].map(k => `<td><input class="form-control form-control-sm" data-part="${k}" data-id="${c.id}" type="number" min="0" max="10" step="0.1" value="${c[k] ?? ''}"></td>`).join('')}
-            <td>${shown}</td><td><button class="btn btn-sm btn-outline-danger" data-del2="${c.id}">×</button></td></tr>`;
+    function row2List(c) {
+        const shown = c.letter ? `<b>${esc(c.letter)}</b>` : '<span class="text-muted">—</span>';
+        return `<tr><td>${esc(c.ten_mon)}</td><td class="text-center">${c.tin_chi}</td><td class="text-center">${shown}</td>
+            <td class="text-end"><button class="btn btn-sm btn-outline-danger" data-del2="${c.id}" type="button">×</button></td></tr>`;
+    }
+    function row2Parts(c) {
+        const inputs = ['bp', 'gk', 'ck'].map(k => `<td style="width:4.5rem"><input class="form-control form-control-sm" data-part="${k}" data-id="${c.id}" type="number" min="0" max="10" step="0.1" value="${c[k] ?? ''}"></td>`).join('');
+        return `<tr><td>${esc(c.ten_mon)}</td>${inputs}
+            <td class="text-center">${c.score10 != null ? c.score10 : '—'}</td>
+            <td class="text-center">${c.letter ? `<b>${esc(c.letter)}</b>` : '—'}</td>
+            <td class="text-center">${c.points != null ? c.points : '—'}</td></tr>`;
     }
     function bind(mount) {
         mount.querySelectorAll('.board-tabs button').forEach(btn => btn.addEventListener('click', () => {
@@ -267,9 +259,11 @@
         const w = weights();
         const fixed = [];
         const variable = [];
-        if (scope === 'overall') {
-            t1.forEach(c => { if (c.points == null && !(c.sim && POINTS[c.sim_letter] != null)) return; const e = effective1(c); fixed.push({ id: c.id, ten_mon: c.ten_mon, credits: c.tin_chi, points: e.points, letter: e.letter }); });
-        }
+        const fromBang1 = (window.transcriptData || []).filter(c => POINTS[c.sim_grade || c.diem_he_4] != null).map(c => ({
+            id: 't1-' + c.ten_mon, ten_mon: c.ten_mon, tin_chi: c.tin_chi, credits: c.tin_chi,
+            letter: c.sim_grade || c.diem_he_4, points: POINTS[c.sim_grade || c.diem_he_4],
+        }));
+        if (scope === 'overall') fromBang1.forEach(c => fixed.push(c));
         t2.forEach(c => {
             if (c.bp != null && c.gk != null && c.ck == null) variable.push({ id: c.id, ten_mon: c.ten_mon, credits: c.tin_chi, bp: c.bp, gk: c.gk });
             else if (c.points != null) fixed.push({ id: c.id, ten_mon: c.ten_mon, credits: c.tin_chi, points: c.points, letter: c.letter });
@@ -321,12 +315,12 @@
         }).join('');
         let retake = '';
         if (label.startsWith('Bất khả thi') && scope === 'overall') {
-            const ideas = t1.filter(c => POINTS[c.letter] != null && POINTS[c.letter] < 4)
-                .map(c => ({ c, gain: 4 - POINTS[c.letter], highlight: c.tin_chi >= 3 && LOW[c.letter] }))
+            const ideas = fromBang1.filter(c => c.points < 4)
+                .map(c => ({ c, gain: 4 - c.points, highlight: c.tin_chi >= 3 && LOW[c.letter] }))
                 .sort((a, b) => (b.highlight - a.highlight) || (b.gain - a.gain) || (b.c.tin_chi - a.c.tin_chi));
             if (ideas.length) {
                 const top = ideas[0].c;
-                const projectedRows = t1.map(c => ({ credits: c.tin_chi, points: c.id === top.id ? 4 : (effective1(c).points) }))
+                const projectedRows = fromBang1.map(c => ({ credits: c.tin_chi, points: c.id === top.id ? 4 : c.points }))
                     .concat(t2.filter(c => c.points != null).map(c => ({ credits: c.tin_chi, points: c.points })));
                 const projected = cpa(projectedRows.filter(r => r.points != null));
                 retake = `<p class="mt-2">Nên học lại <b>${esc(top.ten_mon)}</b> (${top.tin_chi} TC, đang ${esc(top.letter)}) lên A — tăng ${(ideas[0].gain).toFixed(1)} điểm hệ 4 mỗi tín chỉ. CPA dự kiến nếu học lại môn này: <b>${projected == null ? '—' : projected.toFixed(2)}</b>.</p>`;
@@ -340,9 +334,10 @@
         rows.forEach(m => {
             if (String(target) === '1') {
                 const letter = LETTERS.includes(m.diem_he_4) ? m.diem_he_4 : (m.diem_10 != null ? letterOf(m.diem_10)[0] : null);
-                const points = letter ? POINTS[letter] : (m.diem_10 != null ? letterOf(m.diem_10)[1] : null);
-                if (points == null) return;
-                t1.push({ id: uid(), ten_mon: m.ten_mon, tin_chi: m.tin_chi, letter, points, sim: false, sim_letter: 'A' });
+                if (!letter || POINTS[letter] == null) return;
+                if (!window.transcriptData.some(s => s.ten_mon === m.ten_mon)) {
+                    window.transcriptData.push({ ...m, diem_he_4: letter, sim_grade: null, nam_hoc: '', hoc_ky: '', lan: 1 });
+                }
             } else if (m.diem_10 != null || (m.diem_he_4 && POINTS[m.diem_he_4] != null)) {
                 const [letter, points] = m.diem_10 != null ? letterOf(m.diem_10) : [m.diem_he_4, POINTS[m.diem_he_4]];
                 t2.push({ id: uid(), ten_mon: m.ten_mon, tin_chi: m.tin_chi, bp: null, gk: null, ck: null, letter, points, score10: m.diem_10 });
@@ -350,7 +345,13 @@
                 t2.push({ id: uid(), ten_mon: m.ten_mon, tin_chi: m.tin_chi, bp: null, gk: null, ck: null, letter: null, points: null });
             }
         });
-        save(); paint();
+        save();
+        if (String(target) === '1' && typeof saveData === 'function') saveData();
+        paint();
+        if (String(target) === '2') {
+            const tab = document.querySelector('[data-panel="hocphan"]');
+            if (tab) tab.click();
+        }
     };
     paint();
 })();

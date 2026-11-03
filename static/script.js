@@ -254,6 +254,8 @@ function renderTable() {
             selectVal = item.sim_grade;
             rowClass = "table-warning";
         }
+        const lowLetter = ['C', 'D+', 'D', 'F'].includes(item.diem_he_4);
+        if ((item.tin_chi || 0) >= 3 && lowLetter) rowClass += ' row-low';
 
         let displayName = item.ten_mon;
         if (item.percentage) {
