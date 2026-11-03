@@ -11,3 +11,7 @@ services:
         value: "1"
       - key: OMP_NUM_THREADS
         value: "1"
+      - key: MALLOC_ARENA_MAX
+        value: "2"
+      - key: RAPID_LIMIT_SIDE
+        value: "960"

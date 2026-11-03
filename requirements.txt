@@ -9,4 +9,5 @@ rapidocr>=3.0,<4
 pyyaml>=6
 pillow>=10
 gunicorn>=22,<24
+flask-limiter>=3,<4
 # Full build (PaddleOCR det + VietOCR rec, better diacritics, needs ~1.5 GB RAM): see requirements-full.txt

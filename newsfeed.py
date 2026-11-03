@@ -30,7 +30,7 @@ _DATE_TEXT = re.compile(
     re.IGNORECASE,
 )
 _EVENT_HINT = re.compile(
-    r"hạn|đăng ký|đăng kí|thi\b|nộp|diễn ra|tổ chức|khai giảng|hết hạn|trước ngày|từ ngày|đến ngày",
+    r"hạn\s|hạn$|đăng ký|đăng kí|hết hạn|nộp hồ sơ|nộp lệ|đợt thi|ngày thi|thời gian thi|lệ phí",
     re.IGNORECASE,
 )
 
@@ -55,29 +55,36 @@ def categorize(text: str) -> tuple[str, str]:
     return "khac", "Khác"
 
 
-def extract_dates(text: str, title: str, url: str) -> list[dict]:
-    """Lấy mốc ngày trong bài. Không đoán ngày nếu không có đủ ngày-tháng-năm."""
+def extract_dates(text: str, title: str, url: str, post_date: str = "") -> list[dict]:
+    """Chỉ lấy ngày đứng cạnh hạn / đăng ký / lịch thi, và không lệch quá xa ngày đăng."""
     events = []
     seen = set()
     plain = text or ""
+    try:
+        post_year = int((post_date or "0000")[:4])
+    except ValueError:
+        post_year = 0
     for rx in (_DATE_NUM, _DATE_TEXT):
         for m in rx.finditer(plain):
             day, month, year = int(m.group(1)), int(m.group(2)), int(m.group(3))
             if not (1 <= day <= 31 and 1 <= month <= 12):
                 continue
+            if post_year and (year < post_year - 1 or year > post_year + 1):
+                continue
             iso = f"{year:04d}-{month:02d}-{day:02d}"
-            start = max(0, m.start() - 70)
-            end = min(len(plain), m.end() + 70)
+            start = max(0, m.start() - 80)
+            end = min(len(plain), m.end() + 80)
             snippet = _SPACE.sub(" ", plain[start:end]).strip()
-            kind = "han" if _EVENT_HINT.search(snippet) else "moc"
-            sig = (iso, kind, url)
+            if not _EVENT_HINT.search(snippet):
+                continue
+            sig = (iso, url)
             if sig in seen:
                 continue
             seen.add(sig)
             events.append({
                 "date": iso,
-                "kind": kind,
-                "label": "Hạn / lịch" if kind == "han" else "Mốc trong bài",
+                "kind": "han",
+                "label": "Hạn / lịch thi",
                 "snippet": snippet[:180],
                 "title": title,
                 "url": url,
@@ -91,14 +98,17 @@ def build_board(posts: list[dict]) -> dict:
     calendar = []
     for post in posts:
         title = _clean(post.get("title") or "")
+        if len(title) < 2:
+            continue
         raw = post.get("content") or post.get("excerpt") or ""
         text = _clean(raw)
         link = post.get("link") or ""
+        posted = (post.get("date") or "")[:10]
         key, label = categorize(f"{title}\n{text}")
         excerpt = text[:320]
         item = {
             "id": post.get("id"),
-            "date": (post.get("date") or "")[:10],
+            "date": posted,
             "title": title,
             "url": link,
             "excerpt": excerpt,
@@ -106,7 +116,7 @@ def build_board(posts: list[dict]) -> dict:
             "category_label": label,
         }
         items.append(item)
-        calendar.extend(extract_dates(text, title, link))
+        calendar.extend(extract_dates(text, title, link, posted))
     calendar.sort(key=lambda e: (e["date"], e["title"]))
     return {"posts": items, "calendar": calendar}
 

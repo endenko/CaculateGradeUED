@@ -14,6 +14,20 @@ class NewsTests(unittest.TestCase):
         self.assertEqual(newsfeed.categorize("Kế hoạch học kỳ 1 đăng ký học phần")[0], "hoc_tap")
         self.assertEqual(newsfeed.categorize("Hội thảo giáo dục trực tuyến")[0], "khac")
 
+    def test_skips_empty_title_and_loose_dates(self):
+        board = newsfeed.build_board([
+            {"id": 1, "date": "2026-11-01", "link": "https://ued.udn.vn/a", "title": {"rendered": ""},
+             "content": {"rendered": "Hạn đăng ký 01/11/2026"}},
+            {"id": 2, "date": "2026-11-02", "link": "https://ued.udn.vn/b",
+             "title": {"rendered": "Lịch thi tiếng Anh"},
+             "content": {"rendered": "Năm 2019 nhà trường tổ chức. Hạn đăng ký 10/11/2026. Đợt thi ngày 25/11/2026."}},
+        ])
+        self.assertEqual(len(board["posts"]), 1)
+        dates = {e["date"] for e in board["calendar"]}
+        self.assertIn("2026-11-10", dates)
+        self.assertIn("2026-11-25", dates)
+        self.assertNotIn("2019-01-01", dates)
+
     def test_extract_exam_date(self):
         text = (
             "Thông báo về việc tổ chức đánh giá năng lực tiếng Anh chuẩn đầu ra. "

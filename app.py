@@ -13,6 +13,10 @@ Ported from LocalOCR.py (original repo) with these changes:
 Original parsing logic (regex, fuzzy matching, grade conversion) is unchanged.
 """
 import os
+os.environ.setdefault("MALLOC_ARENA_MAX", "2")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("RAPID_LIMIT_SIDE", "960")
+
 import re
 from rapidfuzz import fuzz, process
 
@@ -21,11 +25,16 @@ from werkzeug.utils import secure_filename
 
 import db
 import newsfeed
+import ocr_queue
 import regulations
 from ocr import engines
 from utils import no_accent_vietnamese, normalize
+from flask_limiter import Limiter
+from flask_limiter.errors import RateLimitExceeded
+from flask_limiter.util import get_remote_address
 
 app = Flask(__name__)
+limiter = Limiter(key_func=get_remote_address, app=app, default_limits=[], storage_uri="memory://")
 
 # --- CẤU HÌNH (từ biến môi trường, không còn đường dẫn Windows cứng) ---
 UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', '/tmp/uploads' if os.environ.get('VERCEL') else 'uploads')
@@ -414,32 +423,80 @@ def search_subject():
     return jsonify(db.search_subjects(query, khoa=request.args.get('khoa') or None))
 
 
-@app.route('/api/process_ocr', methods=['POST'])
-def process_ocr():
-    if 'file_anh' not in request.files:
-        return jsonify({"success": False, "error": "Chưa chọn file"})
-    file = request.files['file_anh']
-    mode = request.form.get('mode', 'computer')
-
-    if file:
-        filename = secure_filename(file.filename)
-        path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(path)
+def _run_ocr_file(path, mode):
+    try:
+        if mode == 'handwriting':
+            word_list, engine = engines.handwriting_words(path)
+            lines = reconstruct_lines(word_list, mode)
+            extracted_data = parse_handwriting(lines)
+        else:
+            word_list = engines.computer_words(path)
+            lines = reconstruct_lines(word_list, mode)
+            extracted_data = parse_computer(lines)
+            engine = 'rapidocr-onnx' if engines.OCR_HANDWRITING_ENGINE == 'rapid' else ('tesseract' if engines._tesseract_is_available() else 'paddle-det+vietocr')
+        return {"success": True, "data": extracted_data, "engine": engine}
+    except Exception as exc:
+        return {"success": False, "error": str(exc)}
+    finally:
         try:
-            if mode == 'handwriting':
-                word_list, engine = engines.handwriting_words(path)
-                lines = reconstruct_lines(word_list, mode)
-                extracted_data = parse_handwriting(lines)
-            else:
-                word_list = engines.computer_words(path)
-                lines = reconstruct_lines(word_list, mode)
-                extracted_data = parse_computer(lines)
-                engine = 'rapidocr-onnx' if engines.OCR_HANDWRITING_ENGINE == 'rapid' else ('tesseract' if engines._tesseract_is_available() else 'paddle-det+vietocr')
+            os.remove(path)
+        except OSError:
+            pass
 
-            return jsonify({"success": True, "data": extracted_data, "engine": engine})
-        except Exception as e:
-            return jsonify({"success": False, "error": str(e)})
-    return jsonify({"success": False, "error": "File không hợp lệ"})
+
+ocr_queue.queue.set_runner(_run_ocr_file)
+
+
+@app.errorhandler(RateLimitExceeded)
+def _ocr_rate_limited(_exc):
+    return jsonify({
+        "success": False,
+        "accepted": False,
+        "error": "Bạn gửi ảnh OCR quá nhanh. Mỗi máy chỉ được 5 ảnh mỗi phút và 30 ảnh mỗi giờ. Đợi một lát rồi thử lại nhé.",
+    }), 429
+
+
+def _save_upload():
+    if 'file_anh' not in request.files:
+        return None, (jsonify({"success": False, "error": "Chưa chọn file"}), 400)
+    file = request.files['file_anh']
+    if not file:
+        return None, (jsonify({"success": False, "error": "File không hợp lệ"}), 400)
+    filename = secure_filename(file.filename) or "scan.jpg"
+    path = os.path.join(app.config['UPLOAD_FOLDER'], f"{os.urandom(4).hex()}_{filename}")
+    file.save(path)
+    return path, None
+
+
+@app.route('/api/ocr/jobs', methods=['POST'])
+@limiter.limit("5 per minute; 30 per hour")
+def ocr_job_submit():
+    path, err = _save_upload()
+    if err:
+        return err
+    mode = request.form.get('mode', 'computer')
+    ticket = ocr_queue.queue.submit(path, mode)
+    code = 200 if ticket.get("accepted", True) else 429
+    return jsonify(ticket), code
+
+
+@app.route('/api/ocr/jobs/<job_id>')
+def ocr_job_status(job_id):
+    info = ocr_queue.queue.status(job_id)
+    if not info.get("found"):
+        return jsonify(info), 404
+    return jsonify(info)
+
+
+@app.route('/api/process_ocr', methods=['POST'])
+@limiter.limit("5 per minute; 30 per hour")
+def process_ocr():
+    """Giữ lối gọi đồng bộ cho công cụ cũ. Giao diện dùng hàng đợi /api/ocr/jobs."""
+    path, err = _save_upload()
+    if err:
+        return err
+    mode = request.form.get('mode', 'computer')
+    return jsonify(_run_ocr_file(path, request.form.get('mode', mode)))
 
 
 @app.route('/api/scan_detail_score', methods=['POST'])

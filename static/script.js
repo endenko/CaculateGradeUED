@@ -121,19 +121,45 @@ async function uploadOCR() {
     const formData = new FormData();
     formData.append('file_anh', await downscale(fileInput.files[0]));
     formData.append('mode', mode);
-    document.getElementById('ocrLoading').style.display = 'inline-block';
-    fetch('/api/process_ocr', { method: 'POST', body: formData })
-        .then(res => res.json())
-        .then(resp => {
-            document.getElementById('ocrLoading').style.display = 'none';
-            if (!resp.success) return alert("Lỗi OCR: " + resp.error);
-            pendingOCR = resp.data;
-            renderOCRReview(resp.engine);
-        })
-        .catch(() => {
-            document.getElementById('ocrLoading').style.display = 'none';
-            alert("Lỗi kết nối server!");
-        });
+    const loading = document.getElementById('ocrLoading');
+    const queueBox = document.getElementById('ocrQueue');
+    loading.style.display = 'inline-block';
+    if (queueBox) { queueBox.hidden = false; queueBox.textContent = 'Đang đưa ảnh vào hàng đợi…'; }
+    try {
+        const submit = await fetch('/api/ocr/jobs', { method: 'POST', body: formData });
+        const ticket = await submit.json();
+        if (!submit.ok || ticket.accepted === false) {
+            loading.style.display = 'none';
+            return alert(ticket.error || 'Không xếp hàng được');
+        }
+        const result = await pollOcr(ticket.id, queueBox);
+        loading.style.display = 'none';
+        if (!result || !result.success) return alert('Lỗi OCR: ' + ((result && result.error) || 'không rõ'));
+        pendingOCR = result.data;
+        renderOCRReview(result.engine);
+        if (queueBox) queueBox.textContent = 'Xong. Kiểm tra các dòng bên dưới rồi thêm vào bảng.';
+    } catch (err) {
+        loading.style.display = 'none';
+        alert('Lỗi kết nối server!');
+    }
+}
+
+async function pollOcr(id, queueBox) {
+    for (let i = 0; i < 120; i++) {
+        const res = await fetch('/api/ocr/jobs/' + id);
+        const info = await res.json();
+        if (queueBox) {
+            if (info.status === 'queued') {
+                queueBox.textContent = `Hàng đợi: vị trí ${info.position}. Ước tính chờ khoảng ${info.eta_seconds} giây (ETA = số việc phía trước × ${info.avg_seconds}s).`;
+            } else if (info.status === 'running') {
+                queueBox.textContent = `Đang nhận diện ảnh của bạn. Còn khoảng ${info.eta_seconds} giây.`;
+            }
+        }
+        if (info.status === 'done') return info.result;
+        if (info.status === 'error') return { success: false, error: info.error };
+        await new Promise(r => setTimeout(r, 1000));
+    }
+    return { success: false, error: 'Quá thời gian chờ hàng đợi' };
 }
 
 function renderOCRReview(engine) {
@@ -154,6 +180,14 @@ function renderOCRReview(engine) {
 }
 
 function confirmOCR() {
+    if (window.boardsAddOcr) {
+        const rows = [];
+        document.querySelectorAll('.ocr-chk:checked').forEach(chk => rows.push(pendingOCR[parseInt(chk.dataset.i, 10)]));
+        const target = (document.querySelector('input[name="ocrTarget"]:checked') || {}).value || '1';
+        window.boardsAddOcr(target, rows);
+        document.getElementById('ocrReview').innerHTML = `<div class="alert alert-success small mb-0">Đã thêm ${rows.length} môn vào bảng ${target}.</div>`;
+        return;
+    }
     let count = 0;
     document.querySelectorAll('.ocr-chk:checked').forEach(chk => {
         const m = pendingOCR[parseInt(chk.dataset.i)];
@@ -202,6 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function renderTable() {
     const tbody = document.getElementById('transcriptTable');
+    if (!tbody || tbody.closest('[hidden]')) return;
     tbody.innerHTML = '';
 
     transcriptData.forEach((item, index) => {

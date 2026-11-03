@@ -420,12 +420,15 @@ def _get_rapid():
                       "Det.model_type": ModelType.MOBILE}
         params["Global.use_cls"] = False
         # bound detector input -> bounded RAM (fits 512 MB hosts)
+        side = int(os.environ.get('RAPID_LIMIT_SIDE', '960'))
         params["Det.limit_type"] = os.environ.get('RAPID_LIMIT_TYPE', 'max')
-        params["Det.limit_side_len"] = int(os.environ.get('RAPID_LIMIT_SIDE', '1600'))
-        params["EngineConfig.onnxruntime.intra_op_num_threads"] = int(os.environ.get('OMP_NUM_THREADS', '2'))
-        cls = os.path.join(MODELS_DIR, 'ch_ppocr_mobile_v2.0_cls_mobile.onnx')
-        if os.path.exists(cls):
-            params["Cls.model_path"] = cls
+        params["Det.limit_side_len"] = side
+        params["Global.max_side_len"] = side
+        params["Global.use_cls"] = False
+        threads = int(os.environ.get('OMP_NUM_THREADS', '1'))
+        params["EngineConfig.onnxruntime.intra_op_num_threads"] = threads
+        params["EngineConfig.onnxruntime.inter_op_num_threads"] = 1
+        params["EngineConfig.onnxruntime.enable_cpu_mem_arena"] = False
         if os.path.exists(os.path.join(MODELS_DIR, det)):
             params["Det.model_path"] = os.path.join(MODELS_DIR, det)
         if os.path.exists(os.path.join(MODELS_DIR, rec)):
@@ -455,6 +458,17 @@ def rapid_words(image_path):
                 os.remove(tmp_path)
             except OSError:
                 pass
+        _release_ocr_memory()
+
+
+def _release_ocr_memory():
+    import gc
+    gc.collect()
+    try:
+        import ctypes
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
+    except Exception:
+        pass
 
 
 # ===========================================================================

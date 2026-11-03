@@ -47,6 +47,7 @@
     }
 
     async function refreshAcademics() {
+        if (window.boardsOwnGpa) return;
         const box = $('sideSummary');
         if (!box) return;
         try {
