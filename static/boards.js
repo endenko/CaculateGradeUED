@@ -1,38 +1,29 @@
-/* Hai bảng điểm + giải mục tiêu. Cùng công thức với solver.py (QĐ 1586). */
+/* Điểm học phần: một bảng học kỳ, sửa từng môn, tối đa 5 phương án mục tiêu. */
 (function () {
     const PLAN = [
-        ['D', 4.0, 1], ['D+', 5.0, 1.5], ['C', 5.5, 2], ['C+', 6.5, 2.5],
-        ['B', 7.0, 3], ['B+', 8.0, 3.5], ['A', 8.5, 4]
+        ['A+', 9.5, 4], ['A', 8.5, 4], ['B+', 8.0, 3.5], ['B', 7.0, 3],
+        ['C+', 6.5, 2.5], ['C', 5.5, 2], ['D+', 5.0, 1.5], ['D', 4.0, 1]
     ];
-    const LETTERS = ['A+', 'A', 'B+', 'B', 'C+', 'C', 'D+', 'D', 'F'];
     const POINTS = { 'A+': 4, 'A': 4, 'B+': 3.5, 'B': 3, 'C+': 2.5, 'C': 2, 'D+': 1.5, 'D': 1, 'F': 0 };
     const LOW = { C: 1, 'D+': 1, D: 1, F: 1 };
-    let t1 = JSON.parse(localStorage.getItem('ued_table1') || 'null');
-    let t2 = JSON.parse(localStorage.getItem('ued_table2') || 'null');
-    if (!t1) {
-        t1 = (window.transcriptData || []).filter(c => c.diem_he_4).map(fromLegacy);
-        t2 = [];
-    }
+    let t2 = JSON.parse(localStorage.getItem('ued_table2') || 'null') || [];
+    let editingId = null;
+    let picked = null;
+    let optionReq = 0;
     window.boardsOwnGpa = true;
 
-    function fromLegacy(c) {
-        return {
-            id: uid(), ten_mon: c.ten_mon, tin_chi: c.tin_chi,
-            letter: c.diem_he_4, points: POINTS[c.diem_he_4] ?? null,
-            sim: false, sim_letter: 'A'
-        };
-    }
+    const $ = (id) => document.getElementById(id);
     function uid() { return Math.random().toString(36).slice(2, 10); }
+    function esc(t) { return String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
     function round1(x) { return Math.round((x + Number.EPSILON) * 10) / 10; }
     function round2(x) { return Math.round((x + Number.EPSILON) * 100) / 100; }
-    function esc(t) { return String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
     function weights() {
         const b = num('wBp', 20), g = num('wGk', 30), c = num('wCk', 50);
         const s = b + g + c;
         return s ? [b / s, g / s, c / s] : [0.2, 0.3, 0.5];
     }
     function num(id, fallback) {
-        const el = document.getElementById(id);
+        const el = $(id);
         const n = el ? parseFloat(el.value) : NaN;
         return Number.isFinite(n) ? n : fallback;
     }
@@ -50,302 +41,383 @@
     }
     function minCk(bp, gk, minScore, w) {
         const [wb, wg, wc] = w;
-        if (wc <= 0) return null;
+        if (!(wc > 0)) return null;
         for (let ck = 0; ck <= 10.001; ck = Math.round((ck + 0.1) * 10) / 10) {
             if (round1(bp * wb + gk * wg + ck * wc) >= minScore - 1e-9) return ck;
         }
         return null;
     }
+    function badge(letter) {
+        let cls = 'bg-F';
+        const d = letter || '';
+        if (d.includes('A+')) cls = 'bg-A-plus';
+        else if (d.includes('A')) cls = 'bg-A';
+        else if (d.includes('B')) cls = 'bg-B';
+        else if (d.includes('C')) cls = 'bg-C';
+        else if (d.includes('D')) cls = 'bg-D';
+        return `<span class="badge-grade ${cls}">${esc(letter)}</span>`;
+    }
+    function semKey(c) {
+        if (!c || c.term_unknown || !c.nam_hoc || !c.hoc_ky) return 'unknown';
+        return c.nam_hoc + '|' + c.hoc_ky;
+    }
+    function semLabel(key) {
+        if (!key || key === 'unknown') return 'Không xác định được kỳ/năm';
+        const [year, ky] = key.split('|');
+        return `${year} · Học kỳ ${ky === 'he' ? 'hè' : ky}`;
+    }
+    function currentKey() {
+        return ($('semSelect') && $('semSelect').value) || 'unknown';
+    }
+    function visible() {
+        const key = currentKey();
+        return t2.filter(c => semKey(c) === key);
+    }
+    function save() { localStorage.setItem('ued_table2', JSON.stringify(t2)); }
+    function blank(partial) {
+        return Object.assign({
+            id: uid(), ten_mon: '', tin_chi: 3, letter: null, points: null, score10: null,
+            bp: null, gk: null, ck: null, nam_hoc: null, hoc_ky: null, term_unknown: true,
+            lan: 1, in_progress: true, from_ocr: false,
+        }, partial);
+    }
+
+    function fillSemSelect() {
+        const sel = $('semSelect');
+        if (!sel) return;
+        const prev = sel.value;
+        const keys = [];
+        t2.forEach(c => { const k = semKey(c); if (!keys.includes(k)) keys.push(k); });
+        if (!keys.length) keys.push('unknown');
+        keys.sort((a, b) => (a === 'unknown') - (b === 'unknown') || (a < b ? 1 : -1));
+        sel.innerHTML = keys.map(k => `<option value="${esc(k)}">${esc(semLabel(k))}</option>`).join('');
+        if (keys.includes(prev)) sel.value = prev;
+        else if (keys.includes('unknown') && keys.length === 1) sel.value = 'unknown';
+        else sel.value = keys.find(k => k !== 'unknown') || keys[0];
+    }
+
+    function renderBody() {
+        const body = $('hpBody');
+        if (!body) return;
+        const rows = visible();
+        if (!rows.length) {
+            body.innerHTML = '<tr><td colspan="6" class="small text-muted">Chưa có môn trong kỳ này. Tìm trong cơ sở dữ liệu hoặc quét ảnh portal.</td></tr>';
+            return;
+        }
+        body.innerHTML = rows.map(c => {
+            const low = c.tin_chi >= 3 && LOW[c.letter];
+            const score = c.letter ? badge(c.letter) + (c.score10 != null ? `<div class="small text-muted">${c.score10}</div>` : '') : '<span class="text-muted">Đang học</span>';
+            const term = semKey(c) === 'unknown' ? 'Không xác định được kỳ/năm' : `${esc(c.nam_hoc)}<br>HK${c.hoc_ky === 'he' ? ' hè' : esc(c.hoc_ky)} · lần ${c.lan || 1}`;
+            return `<tr class="${low ? 'row-low' : ''}" data-row="${c.id}">
+                <td>${esc(c.ten_mon)}</td>
+                <td class="text-center fw-bold">${c.tin_chi}</td>
+                <td class="text-center">${score}</td>
+                <td class="text-center small hp-term">${term}</td>
+                <td class="text-center"><button type="button" class="btn-sua" data-edit="${c.id}">Sửa</button></td>
+                <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger" data-del="${c.id}">×</button></td>
+            </tr>`;
+        }).join('');
+        body.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => openEditor(btn.dataset.edit)));
+        body.querySelectorAll('[data-del]').forEach(btn => btn.addEventListener('click', () => {
+            t2 = t2.filter(c => c.id !== btn.dataset.del);
+            if (editingId === btn.dataset.del) closeEditor();
+            save(); fillSemSelect(); renderBody(); renderOptions();
+        }));
+    }
+
+    function openEditor(id) {
+        editingId = id;
+        const box = $('courseEditor');
+        if (box) box.hidden = false;
+        renderEditor();
+    }
+    function closeEditor() {
+        editingId = null;
+        const box = $('courseEditor');
+        if (box) box.hidden = true;
+    }
+    function editing() { return t2.find(c => c.id === editingId) || null; }
+
+    function readEditorInputs() {
+        const row = editing();
+        if (!row) return;
+        ['bp', 'gk', 'ck'].forEach(k => {
+            const el = $('ed' + (k === 'bp' ? 'Bp' : k === 'gk' ? 'Gk' : 'Ck'));
+            if (!el) return;
+            if (el.value === '') row[k] = null;
+            else {
+                const v = Math.min(10, Math.max(0, parseFloat(el.value)));
+                row[k] = Number.isFinite(v) ? v : null;
+            }
+        });
+        if (row.bp != null && row.gk != null && row.ck != null) {
+            const w = weights();
+            const score = round1(row.bp * w[0] + row.gk * w[1] + row.ck * w[2]);
+            const [letter, pts] = letterOf(score);
+            row.score10 = score; row.letter = letter; row.points = pts; row.in_progress = false;
+        } else if (row.ck == null && !row.from_ocr) {
+            row.letter = null; row.points = null; row.score10 = null; row.in_progress = true;
+        }
+        save();
+    }
+
+    function renderEditor() {
+        const row = editing();
+        const box = $('courseEditor');
+        if (!box) return;
+        if (!row) { box.hidden = true; return; }
+        box.hidden = false;
+        $('edTitle').textContent = row.ten_mon;
+        $('edMeta').textContent = semKey(row) === 'unknown' ? 'Không xác định được kỳ/năm' : semLabel(semKey(row)) + (row.lan > 1 ? ' · lần ' + row.lan : '');
+        $('edTc').textContent = row.tin_chi + ' tín chỉ';
+        $('edBp').value = row.bp ?? '';
+        $('edGk').value = row.gk ?? '';
+        $('edCk').value = row.ck ?? '';
+        const cur = $('edCurrent');
+        if (row.letter && row.ck != null) {
+            cur.innerHTML = `<div class="fw-bold">Kết quả: ${badge(row.letter)} ${row.score10 != null ? row.score10 : ''} · hệ 4: ${row.points}</div>`;
+        } else if (row.from_ocr && row.letter) {
+            cur.innerHTML = `<div class="fw-bold">Đã có điểm tổng kết ${badge(row.letter)}${row.score10 != null ? ' (' + row.score10 + ')' : ''}. Có thể nhập thành phần nếu muốn tính lại.</div>`;
+        } else if (row.in_progress) {
+            cur.innerHTML = '<div class="text-muted">Môn đang học — nhập bộ phận và giữa kỳ, để trống cuối kỳ để xem điểm cuối kỳ cần đạt.</div>';
+        } else cur.innerHTML = '';
+        renderNeeded(row);
+    }
+
+    function renderNeeded(row) {
+        const host = $('edNeeded');
+        if (!host) return;
+        if (row.bp == null || row.gk == null || row.ck != null) { host.innerHTML = ''; return; }
+        const w = weights();
+        const cells = PLAN.map(([letter, minimum]) => {
+            const ck = minCk(row.bp, row.gk, minimum, w);
+            const over = ck == null || ck > 10;
+            return `<div class="ck-cell ${over ? 'over' : ''}"><b>${letter}</b>${over ? 'không đạt (&gt;10)' : 'CK ≥ ' + ck.toFixed(1)}</div>`;
+        }).join('');
+        host.innerHTML = `<div class="small fw-bold mb-1">Cuối kỳ tối thiểu (thang 10) để được từng chữ</div><div class="ck-grid">${cells}</div>`;
+    }
+
+    function renderOptions() {
+        const host = $('semOptions');
+        if (!host) return;
+        const target = parseFloat(($('semTarget') || {}).value || '3.2');
+        const rows = visible();
+        const req = ++optionReq;
+        const payload = {
+            target,
+            weights: weights(),
+            table2: rows.map(c => ({
+                id: c.id, ten_mon: c.ten_mon, credits: c.tin_chi,
+                bp: c.bp, gk: c.gk, ck: c.ck, letter: c.letter, points: c.points,
+            })),
+        };
+        fetch('/api/semester_options', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+        }).then(r => r.json()).then(data => {
+            if (req !== optionReq) return;
+            const options = (data.options || []).slice(0, 5);
+            if (!options.length) { host.innerHTML = '<div class="text-muted">Chưa có phương án.</div>'; return; }
+            host.innerHTML = options.map((opt, i) => {
+                const lines = (opt.courses || []).map(c => {
+                    const ck = c.ck_over || c.min_ck == null ? 'CK &gt; 10' : 'CK ' + Number(c.min_ck).toFixed(1);
+                    return `${esc(c.ten_mon)} <b>${esc(c.letter)}</b> (${ck})`;
+                }).join(', ');
+                const head = opt.courses && opt.courses.length ? lines : esc(opt.summary || '');
+                const gpa = opt.gpa == null ? '—' : Number(opt.gpa).toFixed(2);
+                return `<div class="sem-option"><span class="tag">${i + 1}. GPA ${gpa}</span> · ${esc(opt.label || '')}<div>${head}</div></div>`;
+            }).join('');
+        }).catch(() => {
+            if (req === optionReq) host.innerHTML = '<div class="text-danger">Không tính được phương án.</div>';
+        });
+    }
+
     function cpa(rows) {
         let cr = 0, q = 0;
         rows.forEach(r => { cr += r.credits; q += r.points * r.credits; });
         return cr ? round2(q / cr) : null;
     }
-    function effective1(c) {
-        const sim = c.sim && POINTS[c.sim_letter] != null;
-        return { points: sim ? POINTS[c.sim_letter] : c.points, letter: sim ? c.sim_letter : c.letter, credits: c.tin_chi };
-    }
-    function save() {
-        localStorage.setItem('ued_table1', JSON.stringify(t1));
-        localStorage.setItem('ued_table2', JSON.stringify(t2));
+    function renderOverall() {
+        const out = $('solveOut');
+        if (!out) return;
+        const target = parseFloat(($('solveTarget') || {}).value || '3.2');
+        const w = weights();
+        const fixed = [];
+        const variable = [];
+        (window.transcriptData || []).forEach(c => {
+            const letter = c.sim_grade || c.diem_he_4;
+            if (POINTS[letter] == null) return;
+            fixed.push({ id: 't1-' + c.ten_mon, ten_mon: c.ten_mon, credits: c.tin_chi, points: POINTS[letter], letter });
+        });
+        visible().forEach(c => {
+            if (c.bp != null && c.gk != null && c.ck == null) variable.push(c);
+            else if (c.points != null) fixed.push({ id: c.id, ten_mon: c.ten_mon, credits: c.tin_chi, points: c.points, letter: c.letter });
+        });
+        let assignment = null;
+        const order = [['D', 4, 1], ['D+', 5, 1.5], ['C', 5.5, 2], ['C+', 6.5, 2.5], ['B', 7, 3], ['B+', 8, 3.5], ['A', 8.5, 4]];
+        function bestUnder(course, cap) {
+            let chosen = null;
+            for (const [letter, minimum, points] of order) {
+                const ck = minCk(course.bp, course.gk, minimum, w);
+                if (ck == null || ck > cap + 1e-9) continue;
+                chosen = { letter, points, ck, minimum };
+            }
+            return chosen;
+        }
+        function gpaOf(asg) {
+            const rows = fixed.map(r => ({ credits: r.credits, points: r.points }));
+            variable.forEach(c => rows.push({ credits: c.tin_chi, points: asg[c.id].points }));
+            return cpa(rows);
+        }
+        if (!variable.length) {
+            const now = cpa(fixed.map(r => ({ credits: r.credits, points: r.points })));
+            const ok = now != null && now + 1e-9 >= target;
+            out.innerHTML = `<b class="${ok ? 'text-success' : 'text-danger'}">${ok ? 'Đã đạt mốc' : 'Chưa đạt mốc'}</b> — CPA hiện ${now == null ? '—' : now.toFixed(2)}.`;
+            return;
+        }
+        for (let cap = 0; cap <= 10.001; cap = Math.round((cap + 0.1) * 10) / 10) {
+            const trial = {};
+            let ok = true;
+            for (const course of variable) {
+                const plan = bestUnder(course, cap);
+                if (!plan) { ok = false; break; }
+                trial[course.id] = plan;
+            }
+            if (ok && gpaOf(trial) + 1e-9 >= target) { assignment = trial; break; }
+        }
+        const impossible = !assignment;
+        if (impossible) {
+            assignment = {};
+            variable.forEach(c => { assignment[c.id] = { letter: 'A', points: 4, ck: minCk(c.bp, c.gk, 8.5, w), minimum: 8.5 }; });
+        }
+        const lines = variable.map(c => {
+            const p = assignment[c.id];
+            const ck = p.ck == null || p.ck > 10 ? 'CK &gt; 10' : p.ck.toFixed(1);
+            return `<li><b>${esc(c.ten_mon)}</b>: ${p.letter}, CK tối thiểu ${ck}</li>`;
+        }).join('');
+        const achieved = gpaOf(assignment);
+        out.innerHTML = `<div class="fw-bold">${impossible ? 'Bất khả thi trong kỳ này' : 'Có phương án'}</div>
+            <div>CPA sau phân bổ: <b>${achieved == null ? '—' : achieved.toFixed(2)}</b> (mốc ${target})</div><ul>${lines}</ul>`;
     }
 
-    function paint() {
-        const b2 = document.getElementById('panel-bang2');
-        const hp = document.getElementById('panel-diemhp');
-        const mt = document.getElementById('panel-muctieu');
-        if (!b2 || !hp || !mt) return;
-        const keepTarget = (document.getElementById('solveTarget') || {}).value;
-        const keepScope = (document.getElementById('solveScope') || {}).value;
-        const w = weights();
-        const empty2 = '<tr><td colspan="4" class="small text-muted">Chưa có môn. Tìm trong cơ sở dữ liệu hoặc quét ảnh và chọn Bảng 2.</td></tr>';
-        b2.innerHTML = `
-            <div class="card p-3">
-              <h5 class="section-title">Bảng 2 — học kỳ hiện tại</h5>
-              ${searchBox(2)}
-              <div class="table-scroll"><table class="table table-sm align-middle ued-table">
-                <thead><tr><th>Môn</th><th class="text-center">TC</th><th class="text-center">Chữ</th><th></th></tr></thead>
-                <tbody>${t2.map(row2List).join('') || empty2}</tbody>
-              </table></div>
-            </div>`;
-        hp.innerHTML = `
-            <div class="card p-3">
-              <h5 class="section-title">Điểm học phần</h5>
-              <div class="row g-2 mb-2 small">
-                <div class="col-4"><label class="form-label small mb-1">BP / chuyên cần %</label><input id="wBp" class="form-control form-control-sm" type="number" min="0" max="100" value="${esc(savedWeight('wBp', 20))}"></div>
-                <div class="col-4"><label class="form-label small mb-1">GK %</label><input id="wGk" class="form-control form-control-sm" type="number" min="0" max="100" value="${esc(savedWeight('wGk', 30))}"></div>
-                <div class="col-4"><label class="form-label small mb-1">CK %</label><input id="wCk" class="form-control form-control-sm" type="number" min="0" max="100" value="${esc(savedWeight('wCk', 50))}"></div>
-              </div>
-              <p class="small text-muted mb-2">Điểm học phần = BP×${w[0].toFixed(2)} + GK×${w[1].toFixed(2)} + CK×${w[2].toFixed(2)}, làm tròn 1 số rồi xếp chữ theo QĐ 1586.</p>
-              <div class="table-scroll table-wide"><table class="table table-sm align-middle ued-table">
-                <thead><tr><th>Môn</th><th>BP</th><th>GK</th><th>CK</th><th class="text-center">Điểm</th><th class="text-center">Chữ</th><th class="text-center">Hệ 4</th></tr></thead>
-                <tbody>${t2.map(row2Parts).join('') || '<tr><td colspan="7" class="small text-muted">Thêm môn ở Bảng 2 để nhập điểm thành phần.</td></tr>'}</tbody>
-              </table></div>
-            </div>`;
-        mt.innerHTML = `
-        <div class="card p-3" id="solverCard">
-          <h5 class="section-title">Mục tiêu điểm</h5>
-          <div class="row g-2 align-items-end">
-            <div class="col-md-4"><label class="form-label small">Mốc</label>
-              <select id="solveTarget" class="form-select form-select-sm">
-                <option value="3.6">Xuất sắc 3,6</option>
-                <option value="3.2" selected>Giỏi 3,2</option>
-                <option value="2.5">Khá 2,5</option>
-              </select></div>
-            <div class="col-md-4"><label class="form-label small">Phạm vi</label>
-              <select id="solveScope" class="form-select form-select-sm">
-                <option value="overall">CPA cả hai bảng</option>
-                <option value="semester">GPA học kỳ này</option>
-              </select></div>
-            <div class="col-md-4"><button type="button" class="btn btn-ued btn-sm w-100" id="btnSolve">Tính điểm cần đạt</button></div>
-          </div>
-          <div id="solveOut" class="small mt-3"></div>
-        </div>`;
-        bind(document);
-        if (keepTarget && document.getElementById('solveTarget')) document.getElementById('solveTarget').value = keepTarget;
-        if (keepScope && document.getElementById('solveScope')) document.getElementById('solveScope').value = keepScope;
-    }
-    function savedWeight(key, fallback) {
-        return localStorage.getItem(key) || fallback;
-    }
-    function searchBox(which) {
-        return `<div class="position-relative mb-2">
-            <input class="form-control form-control-sm board-search" data-which="${which}" placeholder="${which === 1 ? 'Tìm môn trong CSDL, ví dụ Lập trình Java' : 'Tìm môn học kỳ này'}">
-            <div class="suggestions-box" data-sug="${which}"></div>
-            ${which === 1 ? `<div class="input-group input-group-sm mt-1"><input class="form-control grade-for-new" data-which="1" placeholder="Điểm chữ hoặc hệ 10"><button class="btn btn-ued" type="button" data-add="1">Thêm vào bảng 1</button></div>` : `<button class="btn btn-sm btn-outline-ued mt-1" type="button" data-add="2">Thêm vào bảng 2 (chưa có điểm)</button>`}
-        </div>`;
-    }
-    function row1(c) {
-        const low = c.tin_chi >= 3 && LOW[c.letter];
-        const opts = LETTERS.map(L => `<option ${c.sim_letter === L ? 'selected' : ''}>${L}</option>`).join('');
-        return `<tr class="${low ? 'row-low' : ''}"><td>${esc(c.ten_mon)}</td><td>${c.tin_chi}</td><td><b>${esc(c.letter || '')}</b></td>
-            <td><label class="small"><input type="checkbox" data-sim="${c.id}" ${c.sim ? 'checked' : ''}> Giả lập</label>
-            <select class="form-select form-select-sm mt-1" data-simletter="${c.id}">${opts}</select></td>
-            <td><button class="btn btn-sm btn-outline-danger" data-del1="${c.id}">×</button></td></tr>`;
-    }
-    function row2List(c) {
-        const shown = c.letter ? `<b>${esc(c.letter)}</b>` : '<span class="text-muted">—</span>';
-        return `<tr><td>${esc(c.ten_mon)}</td><td class="text-center">${c.tin_chi}</td><td class="text-center">${shown}</td>
-            <td class="text-end"><button class="btn btn-sm btn-outline-danger" data-del2="${c.id}" type="button">×</button></td></tr>`;
-    }
-    function row2Parts(c) {
-        const inputs = ['bp', 'gk', 'ck'].map(k => `<td style="width:4.5rem"><input class="form-control form-control-sm" data-part="${k}" data-id="${c.id}" type="number" min="0" max="10" step="0.1" value="${c[k] ?? ''}"></td>`).join('');
-        return `<tr><td>${esc(c.ten_mon)}</td>${inputs}
-            <td class="text-center">${c.score10 != null ? c.score10 : '—'}</td>
-            <td class="text-center">${c.letter ? `<b>${esc(c.letter)}</b>` : '—'}</td>
-            <td class="text-center">${c.points != null ? c.points : '—'}</td></tr>`;
-    }
-    function bind(mount) {
-        mount.querySelectorAll('.board-search').forEach(input => {
-            let timer;
-            input.addEventListener('input', () => {
-                clearTimeout(timer);
-                timer = setTimeout(() => suggest(input), 250);
+    function bind() {
+        const storedW = JSON.parse(localStorage.getItem('ued_weights') || 'null');
+        if (storedW) { $('wBp').value = storedW[0]; $('wGk').value = storedW[1]; $('wCk').value = storedW[2]; }
+        $('semSelect').addEventListener('change', () => { renderBody(); renderOptions(); if (editing()) renderEditor(); });
+        $('semTarget').addEventListener('change', () => renderOptions());
+        $('btnAssignTerm').addEventListener('click', () => {
+            const year = $('assignYear').value, ky = $('assignTerm').value;
+            visible().forEach(c => { c.nam_hoc = year; c.hoc_ky = ky; c.term_unknown = false; });
+            save(); fillSemSelect(); $('semSelect').value = year + '|' + ky; renderBody(); renderEditor(); renderOptions();
+        });
+        let timer;
+        $('hpSearch').addEventListener('input', () => {
+            clearTimeout(timer);
+            timer = setTimeout(suggest, 250);
+        });
+        $('btnAddHp').addEventListener('click', addPicked);
+        ['wBp', 'wGk', 'wCk'].forEach(id => $(id).addEventListener('change', () => {
+            localStorage.setItem('ued_weights', JSON.stringify([num('wBp', 20), num('wGk', 30), num('wCk', 50)]));
+            t2.forEach(row => {
+                if (row.bp != null && row.gk != null && row.ck != null) {
+                    const w = weights();
+                    const score = round1(row.bp * w[0] + row.gk * w[1] + row.ck * w[2]);
+                    const [letter, pts] = letterOf(score);
+                    row.score10 = score; row.letter = letter; row.points = pts;
+                }
             });
-        });
-        mount.querySelectorAll('[data-add]').forEach(btn => btn.addEventListener('click', () => addManual(btn.dataset.add)));
-        mount.querySelectorAll('[data-sim]').forEach(el => el.addEventListener('change', () => {
-            const row = t1.find(c => c.id === el.dataset.sim); if (row) row.sim = el.checked; save(); paint();
+            save(); renderBody(); renderEditor(); renderOptions();
         }));
-        mount.querySelectorAll('[data-simletter]').forEach(el => el.addEventListener('change', () => {
-            const row = t1.find(c => c.id === el.dataset.simletter); if (row) row.sim_letter = el.value; save(); paint();
+        ['edBp', 'edGk', 'edCk'].forEach(id => $(id).addEventListener('input', () => {
+            readEditorInputs(); renderNeeded(editing() || {}); renderBody(); renderOptions();
         }));
-        mount.querySelectorAll('[data-del1]').forEach(el => el.addEventListener('click', () => { t1 = t1.filter(c => c.id !== el.dataset.del1); save(); paint(); }));
-        mount.querySelectorAll('[data-del2]').forEach(el => el.addEventListener('click', () => { t2 = t2.filter(c => c.id !== el.dataset.del2); save(); paint(); }));
-        mount.querySelectorAll('[data-part]').forEach(el => el.addEventListener('change', () => {
-            const row = t2.find(c => c.id === el.dataset.id); if (!row) return;
-            const v = el.value === '' ? null : Math.min(10, Math.max(0, parseFloat(el.value)));
-            row[el.dataset.part] = Number.isFinite(v) ? v : null;
-            recomputeRow(row);
-            save(); paint();
-        }));
-        ['wBp', 'wGk', 'wCk'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.addEventListener('change', () => { localStorage.setItem(id, el.value); t2.forEach(recomputeRow); save(); paint(); });
+        $('edResult').addEventListener('click', () => { readEditorInputs(); renderEditor(); renderBody(); renderOptions(); });
+        $('edClear').addEventListener('click', () => {
+            const row = editing();
+            if (!row) return;
+            row.bp = row.gk = row.ck = null;
+            if (!row.from_ocr) { row.letter = null; row.points = null; row.score10 = null; row.in_progress = true; }
+            save(); renderEditor(); renderBody(); renderOptions();
         });
-        document.getElementById('btnSolve').addEventListener('click', () => {
-            document.getElementById('solveOut').innerHTML = renderSolve();
-        });
+        const solve = $('btnSolve');
+        if (solve) solve.addEventListener('click', renderOverall);
     }
-    function recomputeRow(row) {
-        if (row.bp == null || row.gk == null || row.ck == null) {
-            if (row.ck == null && !(row.bp != null && row.gk != null)) return;
-            if (row.bp != null && row.gk != null && row.ck == null) { row.letter = null; row.points = null; return; }
-        }
-        if (row.bp != null && row.gk != null && row.ck != null) {
-            const w = weights();
-            const score = round1(row.bp * w[0] + row.gk * w[1] + row.ck * w[2]);
-            const [letter, pts] = letterOf(score);
-            row.letter = letter; row.points = pts; row.score10 = score;
-        }
-    }
-    let picked = { 1: null, 2: null };
-    function suggest(input) {
-        const which = input.dataset.which;
-        const box = input.parentElement.querySelector('[data-sug]');
+
+    function suggest() {
+        const input = $('hpSearch');
+        const box = $('hpSug');
         const q = input.value.trim();
         if (q.length < 2) { box.style.display = 'none'; return; }
         fetch('/api/search_subject?q=' + encodeURIComponent(q)).then(r => r.json()).then(data => {
-            box.innerHTML = data.slice(0, 8).map(item => `<div class="suggestion-item small"><b>${esc(item.ten_mon)}</b> <span class="float-end">${item.tin_chi} TC</span></div>`).join('');
+            box.innerHTML = (data || []).slice(0, 8).map(item => `<div class="suggestion-item small"><b>${esc(item.ten_mon)}</b> <span class="float-end">${item.tin_chi} TC</span></div>`).join('');
             box.style.display = data.length ? 'block' : 'none';
             [...box.children].forEach((el, i) => el.addEventListener('click', () => {
-                picked[which] = data[i];
+                picked = data[i];
                 input.value = data[i].ten_mon;
                 box.style.display = 'none';
             }));
         });
     }
-    function addManual(which) {
-        const item = picked[which];
-        if (!item) return alert('Hãy chọn một môn trong danh sách gợi ý.');
-        if (which === '1') {
-            const raw = (document.querySelector('.grade-for-new') || {}).value || '';
-            let letter, points;
-            if (POINTS[raw.trim().toUpperCase()] != null) {
-                letter = raw.trim().toUpperCase(); points = POINTS[letter];
-            } else if (raw !== '' && !isNaN(parseFloat(raw))) {
-                [letter, points] = letterOf(parseFloat(raw));
-            } else return alert('Nhập điểm chữ (A, B+, …) hoặc điểm hệ 10.');
-            t1.push({ id: uid(), ten_mon: item.ten_mon, tin_chi: item.tin_chi, letter, points, sim: false, sim_letter: 'A' });
-        } else {
-            t2.push({ id: uid(), ten_mon: item.ten_mon, tin_chi: item.tin_chi, bp: null, gk: null, ck: null, letter: null, points: null });
-        }
-        picked[which] = null;
-        save(); paint();
-    }
-    function bestUnder(course, cap, w) {
-        let chosen = null;
-        for (const [letter, minimum, points] of PLAN) {
-            const ck = minCk(course.bp, course.gk, minimum, w);
-            if (ck == null || ck > cap + 1e-9) continue;
-            chosen = { letter, min_score10: minimum, points, ck };
-        }
-        return chosen;
-    }
-    function gpaOf(fixed, variable, assignment) {
-        const rows = fixed.map(r => ({ credits: r.credits, points: r.points }));
-        variable.forEach(c => rows.push({ credits: c.credits, points: assignment[c.id].points }));
-        return cpa(rows.map(r => ({ credits: r.credits, points: r.points, tin_chi: r.credits })));
-    }
-    function renderSolve() {
-        const target = parseFloat(document.getElementById('solveTarget').value);
-        const scope = document.getElementById('solveScope').value;
-        const w = weights();
-        const fixed = [];
-        const variable = [];
-        const fromBang1 = (window.transcriptData || []).filter(c => POINTS[c.sim_grade || c.diem_he_4] != null).map(c => ({
-            id: 't1-' + c.ten_mon, ten_mon: c.ten_mon, tin_chi: c.tin_chi, credits: c.tin_chi,
-            letter: c.sim_grade || c.diem_he_4, points: POINTS[c.sim_grade || c.diem_he_4],
+    function addPicked() {
+        if (!picked) return alert('Hãy chọn một môn trong danh sách gợi ý.');
+        const key = currentKey();
+        const unknown = key === 'unknown';
+        const [year, ky] = unknown ? [null, null] : key.split('|');
+        t2.push(blank({
+            ten_mon: picked.ten_mon, tin_chi: picked.tin_chi,
+            nam_hoc: year, hoc_ky: ky, term_unknown: unknown, in_progress: true,
         }));
-        if (scope === 'overall') fromBang1.forEach(c => fixed.push(c));
-        t2.forEach(c => {
-            if (c.bp != null && c.gk != null && c.ck == null) variable.push({ id: c.id, ten_mon: c.ten_mon, credits: c.tin_chi, bp: c.bp, gk: c.gk });
-            else if (c.points != null) fixed.push({ id: c.id, ten_mon: c.ten_mon, credits: c.tin_chi, points: c.points, letter: c.letter });
-        });
-        let assignment = null;
-        for (let cap = 0; cap <= 10.001; cap = Math.round((cap + 0.1) * 10) / 10) {
-            const trial = {};
-            let ok = true;
-            for (const course of variable) {
-                const plan = bestUnder(course, cap, w);
-                if (!plan) { ok = false; break; }
-                trial[course.id] = plan;
-            }
-            if (ok && (gpaOf(fixed, variable, trial) == null ? false : gpaOf(fixed, variable, trial) + 1e-9 >= target)) {
-                assignment = trial; break;
-            }
-        }
-        let impossible = !assignment;
-        if (!variable.length) {
-            const now = cpa(fixed);
-            return `<div class="${now != null && now >= target ? 'text-success' : 'text-danger'}"><b>${now != null && now >= target ? 'Khả thi (Dễ/Trung bình)' : 'Bất khả thi trong kỳ này'}</b> — CPA hiện ${now == null ? '—' : now.toFixed(2)}, chưa có môn nào đang chờ điểm CK.</div>`;
-        }
-        if (impossible) {
-            assignment = {};
-            variable.forEach(c => { assignment[c.id] = { letter: 'A', min_score10: 8.5, points: 4, ck: minCk(c.bp, c.gk, 8.5, w) }; });
-        } else {
-            let guard = 0;
-            while (guard++ < 400) {
-                const order = [...variable].sort((a, b) => assignment[b.id].ck - assignment[a.id].ck);
-                let changed = false;
-                for (const course of order) {
-                    const cur = assignment[course.id];
-                    const idx = PLAN.findIndex(p => p[0] === cur.letter);
-                    if (idx <= 0) continue;
-                    const [letter, minimum, points] = PLAN[idx - 1];
-                    const ck = minCk(course.bp, course.gk, minimum, w);
-                    const trial = { ...assignment, [course.id]: { letter, min_score10: minimum, points, ck } };
-                    if (gpaOf(fixed, variable, trial) + 1e-9 >= target) { assignment = trial; changed = true; break; }
-                }
-                if (!changed) break;
-            }
-        }
-        const maxCk = Math.max(...variable.map(c => assignment[c.id].ck == null ? 99 : assignment[c.id].ck));
-        const label = (impossible || maxCk > 10) ? 'Bất khả thi trong kỳ này' : (maxCk >= 8.5 ? 'Khó (cần CK >= 8.5)' : 'Khả thi (Dễ/Trung bình)');
-        const lines = variable.map(c => {
-            const p = assignment[c.id];
-            const ck = p.ck == null || p.ck > 10 ? 'không đạt nổi (CK > 10)' : p.ck.toFixed(1);
-            return `<li><b>${esc(c.ten_mon)}</b> (${c.credits} TC): chữ <b>${p.letter}</b>, điểm học phần tối thiểu <b>${p.min_score10}</b>, CK tối thiểu <b>${ck}</b></li>`;
-        }).join('');
-        let retake = '';
-        if (label.startsWith('Bất khả thi') && scope === 'overall') {
-            const ideas = fromBang1.filter(c => c.points < 4)
-                .map(c => ({ c, gain: 4 - c.points, highlight: c.tin_chi >= 3 && LOW[c.letter] }))
-                .sort((a, b) => (b.highlight - a.highlight) || (b.gain - a.gain) || (b.c.tin_chi - a.c.tin_chi));
-            if (ideas.length) {
-                const top = ideas[0].c;
-                const projectedRows = fromBang1.map(c => ({ credits: c.tin_chi, points: c.id === top.id ? 4 : c.points }))
-                    .concat(t2.filter(c => c.points != null).map(c => ({ credits: c.tin_chi, points: c.points })));
-                const projected = cpa(projectedRows.filter(r => r.points != null));
-                retake = `<p class="mt-2">Nên học lại <b>${esc(top.ten_mon)}</b> (${top.tin_chi} TC, đang ${esc(top.letter)}) lên A — tăng ${(ideas[0].gain).toFixed(1)} điểm hệ 4 mỗi tín chỉ. CPA dự kiến nếu học lại môn này: <b>${projected == null ? '—' : projected.toFixed(2)}</b>.</p>`;
-            }
-        }
-        const achieved = gpaOf(fixed, variable, assignment);
-        return `<div class="fw-bold">${label}</div><div>CPA / GPA sau phân bổ: <b>${achieved == null ? '—' : achieved.toFixed(2)}</b> (mốc ${target})</div><ul>${lines}</ul>${retake}`;
+        picked = null;
+        $('hpSearch').value = '';
+        save(); renderBody(); renderOptions();
     }
 
-    window.boardsAddOcr = function (target, rows) {
+    window.boardsAddOcr = function (target, rows, term) {
+        const known = term && term.nam_hoc && term.hoc_ky;
         rows.forEach(m => {
             if (String(target) === '1') {
-                const letter = LETTERS.includes(m.diem_he_4) ? m.diem_he_4 : (m.diem_10 != null ? letterOf(m.diem_10)[0] : null);
-                if (!letter || POINTS[letter] == null) return;
-                if (!window.transcriptData.some(s => s.ten_mon === m.ten_mon)) {
-                    window.transcriptData.push({ ...m, diem_he_4: letter, sim_grade: null, nam_hoc: '', hoc_ky: '', lan: 1 });
+                const letter = m.in_progress ? null : (POINTS[m.diem_he_4] != null ? m.diem_he_4 : (m.diem_10 != null ? letterOf(m.diem_10)[0] : null));
+                if (!letter) return;
+                if (!window.transcriptData.some(s => s.ten_mon === m.ten_mon && s.nam_hoc === (known ? term.nam_hoc : '') && s.hoc_ky === (known ? term.hoc_ky : ''))) {
+                    window.transcriptData.push({
+                        ...m, diem_he_4: letter, sim_grade: null,
+                        nam_hoc: known ? term.nam_hoc : '',
+                        hoc_ky: known ? term.hoc_ky : '',
+                        lan: m.lan || 1,
+                        term_unknown: !known,
+                        pass_only: false,
+                    });
                 }
-            } else if (m.diem_10 != null || (m.diem_he_4 && POINTS[m.diem_he_4] != null)) {
+            } else if (!m.in_progress && (m.diem_10 != null || POINTS[m.diem_he_4] != null)) {
                 const [letter, points] = m.diem_10 != null ? letterOf(m.diem_10) : [m.diem_he_4, POINTS[m.diem_he_4]];
-                t2.push({ id: uid(), ten_mon: m.ten_mon, tin_chi: m.tin_chi, bp: null, gk: null, ck: null, letter, points, score10: m.diem_10 });
+                t2.push(blank({
+                    ten_mon: m.ten_mon, tin_chi: m.tin_chi, letter, points, score10: m.diem_10,
+                    in_progress: false, from_ocr: true, lan: m.lan || 1,
+                    nam_hoc: known ? term.nam_hoc : null, hoc_ky: known ? term.hoc_ky : null, term_unknown: !known,
+                }));
             } else {
-                t2.push({ id: uid(), ten_mon: m.ten_mon, tin_chi: m.tin_chi, bp: null, gk: null, ck: null, letter: null, points: null });
+                t2.push(blank({
+                    ten_mon: m.ten_mon, tin_chi: m.tin_chi, in_progress: true, lan: m.lan || 1,
+                    nam_hoc: known ? term.nam_hoc : null, hoc_ky: known ? term.hoc_ky : null, term_unknown: !known,
+                }));
             }
         });
         save();
         if (String(target) === '1' && typeof saveData === 'function') saveData();
-        paint();
-        if (String(target) === '2') {
-            const tab = document.querySelector('.site-menu [data-panel="bang2"]');
+        fillSemSelect();
+        if (String(target) !== '1') {
+            const key = known ? term.nam_hoc + '|' + term.hoc_ky : 'unknown';
+            if ([...$('semSelect').options].some(o => o.value === key)) $('semSelect').value = key;
+            if (known) { $('assignYear').value = term.nam_hoc; $('assignTerm').value = term.hoc_ky; }
+            renderBody(); renderOptions();
+            const tab = document.querySelector('.site-menu [data-panel="diemhp"]');
             if (tab) tab.click();
         }
     };
-    paint();
+
+    if ($('hpBody')) {
+        bind();
+        fillSemSelect();
+        renderBody();
+        renderOptions();
+    }
 })();

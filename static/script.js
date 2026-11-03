@@ -96,6 +96,7 @@ function addManualSubject() {
 }
 
 let pendingOCR = [];
+let pendingTerm = null;
 function escapeHtml(t) { return String(t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 function downscale(file, maxSide = 2000) {
@@ -136,6 +137,7 @@ async function uploadOCR() {
         loading.style.display = 'none';
         if (!result || !result.success) return alert('Lỗi OCR: ' + ((result && result.error) || 'không rõ'));
         pendingOCR = result.data;
+        pendingTerm = result.term || null;
         renderOCRReview(result.engine);
         if (queueBox) queueBox.textContent = 'Xong. Kiểm tra các dòng bên dưới rồi thêm vào bảng.';
     } catch (err) {
@@ -187,8 +189,10 @@ function confirmOCR() {
         const rows = [];
         document.querySelectorAll('.ocr-chk:checked').forEach(chk => rows.push(pendingOCR[parseInt(chk.dataset.i, 10)]));
         const target = (document.querySelector('input[name="ocrTarget"]:checked') || {}).value || '1';
-        window.boardsAddOcr(target, rows);
-        document.getElementById('ocrReview').innerHTML = `<div class="alert alert-success small mb-0">Đã thêm ${rows.length} môn vào bảng ${target}.</div>`;
+        window.boardsAddOcr(target, rows, pendingTerm || null);
+        const where = String(target) === '1' ? 'Bảng 1' : 'Điểm học phần';
+        const termText = (pendingTerm && pendingTerm.nam_hoc) ? `Kỳ đã gán: Học kỳ ${pendingTerm.hoc_ky === 'he' ? 'hè' : pendingTerm.hoc_ky} · ${pendingTerm.nam_hoc}.` : 'Không xác định được kỳ/năm — chọn kỳ ở Điểm học phần.';
+        document.getElementById('ocrReview').innerHTML = `<div class="alert alert-success small mb-0">Đã thêm ${rows.length} môn vào ${where}. ${termText}</div>`;
         return;
     }
     let count = 0;
@@ -271,7 +275,7 @@ function renderTable() {
             <td>${displayName}</td>
             <td class="text-center fw-bold">${item.tin_chi}</td>
             <td class="text-center"><span class="badge-grade ${badgeClass}">${item.diem_he_4}</span>${item.diem_10 != null ? `<div class="small text-muted">${item.diem_10}</div>` : ''}</td>
-            <td class="text-center small">${item.nam_hoc ? `${item.nam_hoc}<br>HK${item.hoc_ky === 'he' ? ' hè' : item.hoc_ky} · lần ${item.lan || 1}` : '<span class="text-muted">chưa gắn kỳ</span>'}</td>
+            <td class="text-center small">${item.term_unknown ? '<span class="text-muted">Không xác định được kỳ/năm</span>' : (item.nam_hoc ? `${item.nam_hoc}<br>HK${item.hoc_ky === 'he' ? ' hè' : item.hoc_ky} · lần ${item.lan || 1}` : '<span class="text-muted">chưa gắn kỳ</span>')}</td>
             <td class="text-center">
                 <select class="form-select form-select-sm" onchange="updateSim(${index}, this.value)">
                     <option value="" ${selectVal == "" ? "selected" : ""}>— Giữ —</option>

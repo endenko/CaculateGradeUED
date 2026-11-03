@@ -37,7 +37,6 @@
         </button>
         <nav class="site-menu" id="siteMenu" aria-label="Mục">
             <button type="button" data-panel="bangdiem" class="active">Bảng 1</button>
-            <button type="button" data-panel="bang2">Bảng 2</button>
             <button type="button" data-panel="diemhp">Điểm học phần</button>
             <button type="button" data-panel="muctieu">Mục tiêu</button>
             <button type="button" data-panel="drl">Điểm rèn luyện</button>
@@ -134,7 +133,7 @@
                 <div class="d-flex flex-wrap gap-3 mb-2 small">
                     <span class="fw-semibold">Đưa kết quả vào</span>
                     <label class="mb-0"><input type="radio" name="ocrTarget" value="1" checked> Bảng 1 — các kỳ trước</label>
-                    <label class="mb-0"><input type="radio" name="ocrTarget" value="2"> Bảng 2 — học kỳ này</label>
+                    <label class="mb-0"><input type="radio" name="ocrTarget" value="2"> Điểm học phần — học kỳ này</label>
                 </div>
                 <div id="ocrQueue" class="small text-ued mb-2" hidden></div>
                 <div class="mode-switch mb-3" role="group">
@@ -186,9 +185,102 @@
     </div>
 </section>
 
-<section id="panel-bang2" class="tool-panel" hidden></section>
-<section id="panel-diemhp" class="tool-panel" hidden></section>
-<section id="panel-muctieu" class="tool-panel" hidden></section>
+<section id="panel-diemhp" class="tool-panel" hidden>
+    <div class="card p-3 p-md-4 mb-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+            <h5 class="section-title mb-0"><i class="fas fa-table"></i> Điểm học phần</h5>
+            <label class="small mb-0 d-flex align-items-center gap-2">Đang xem
+                <select id="semSelect" class="form-select form-select-sm" style="width:auto;min-width:14rem"></select>
+            </label>
+        </div>
+        <div class="d-flex flex-wrap gap-2 align-items-end mb-2">
+            <div>
+                <label class="form-label small mb-1" for="assignYear">Năm học</label>
+                <select id="assignYear" class="form-select form-select-sm">
+                    <option>2022-2023</option><option>2023-2024</option><option>2024-2025</option>
+                    <option selected>2025-2026</option><option>2026-2027</option><option>2027-2028</option>
+                </select>
+            </div>
+            <div>
+                <label class="form-label small mb-1" for="assignTerm">Học kỳ</label>
+                <select id="assignTerm" class="form-select form-select-sm">
+                    <option value="1">Học kỳ 1</option>
+                    <option value="2" selected>Học kỳ 2</option>
+                    <option value="he">Học kỳ hè</option>
+                </select>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-ued" id="btnAssignTerm">Gán kỳ cho môn đang xem</button>
+        </div>
+        <p class="small text-muted mb-2" id="termHint">Chọn kỳ để xem bảng và để tính mục tiêu học kỳ. Ảnh portal có dòng “Học kỳ / Năm học” sẽ tự gán; nếu không đọc được thì ghi “Không xác định được kỳ/năm”.</p>
+        <div class="position-relative mb-2">
+            <input id="hpSearch" class="form-control form-control-sm" placeholder="Tìm môn học kỳ này, ví dụ Lập trình Java" autocomplete="off">
+            <div id="hpSug" class="suggestions-box"></div>
+            <button type="button" class="btn btn-sm btn-outline-ued mt-1" id="btnAddHp">Thêm môn (chưa có điểm)</button>
+        </div>
+        <div class="row g-2 mb-2 small">
+            <div class="col-4"><label class="form-label small mb-1">Bộ phận / chuyên cần %</label><input id="wBp" class="form-control form-control-sm" type="number" min="0" max="100" value="20"></div>
+            <div class="col-4"><label class="form-label small mb-1">Giữa kỳ %</label><input id="wGk" class="form-control form-control-sm" type="number" min="0" max="100" value="30"></div>
+            <div class="col-4"><label class="form-label small mb-1">Cuối kỳ %</label><input id="wCk" class="form-control form-control-sm" type="number" min="0" max="100" value="50"></div>
+        </div>
+        <div class="table-scroll table-wide">
+            <table class="table table-hover align-middle ued-table mb-0">
+                <thead><tr>
+                    <th>Môn học</th><th class="text-center">TC</th><th class="text-center">Điểm</th>
+                    <th class="text-center hp-term">Học kỳ</th><th class="text-center">Sửa</th><th class="text-center">Xóa</th>
+                </tr></thead>
+                <tbody id="hpBody"></tbody>
+            </table>
+        </div>
+        <div id="courseEditor" class="hp-editor mt-3" hidden>
+            <div class="d-flex justify-content-between align-items-start gap-2">
+                <div>
+                    <div class="hp-kicker">Tính điểm tổng kết môn học</div>
+                    <h6 class="mb-1" id="edTitle"></h6>
+                    <div class="small text-muted" id="edMeta"></div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-danger" id="edClear">Xóa trắng</button>
+            </div>
+            <div class="row g-2 mt-1">
+                <div class="col-6 col-md-3"><div class="hp-field tone-tc"><label>Tín chỉ</label><div id="edTc" class="hp-static"></div></div></div>
+                <div class="col-6 col-md-3"><div class="hp-field tone-bp"><label for="edBp">Điểm bộ phận / chuyên cần</label><input id="edBp" type="number" min="0" max="10" step="0.1" placeholder="0 – 10"></div></div>
+                <div class="col-6 col-md-3"><div class="hp-field tone-gk"><label for="edGk">Điểm giữa kỳ</label><input id="edGk" type="number" min="0" max="10" step="0.1" placeholder="0 – 10"></div></div>
+                <div class="col-6 col-md-3"><div class="hp-field tone-ck"><label for="edCk">Điểm cuối kỳ</label><input id="edCk" type="number" min="0" max="10" step="0.1" placeholder="để trống nếu chưa thi"></div></div>
+            </div>
+            <button type="button" class="btn btn-ued btn-sm mt-2" id="edResult">Xem kết quả</button>
+            <div id="edCurrent" class="mt-2"></div>
+            <div id="edNeeded" class="mt-2"></div>
+        </div>
+        <div class="sem-target mt-3">
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <span class="fw-bold text-ued small">Mục tiêu học kỳ này</span>
+                <select id="semTarget" class="form-select form-select-sm" style="width:auto">
+                    <option value="3.6">Xuất sắc 3,6</option>
+                    <option value="3.2" selected>Giỏi 3,2</option>
+                    <option value="2.5">Khá 2,5</option>
+                </select>
+            </div>
+            <div id="semOptions" class="sem-options"></div>
+        </div>
+    </div>
+</section>
+
+<section id="panel-muctieu" class="tool-panel" hidden>
+    <div class="card p-3 p-md-4">
+        <h5 class="section-title">Mục tiêu CPA (Bảng 1 + học kỳ đang xem)</h5>
+        <p class="small text-muted">GPA tích lũy gồm các môn Bảng 1 và các môn đã có điểm ở học kỳ đang chọn trong Điểm học phần. Môn đang chờ cuối kỳ được phân bổ mức thấp nhất vẫn đạt mốc.</p>
+        <div class="row g-2 align-items-end">
+            <div class="col-md-6"><label class="form-label small">Mốc</label>
+                <select id="solveTarget" class="form-select form-select-sm">
+                    <option value="3.6">Xuất sắc 3,6</option>
+                    <option value="3.2" selected>Giỏi 3,2</option>
+                    <option value="2.5">Khá 2,5</option>
+                </select>
+            </div>
+            <div class="col-md-6"><button type="button" class="btn btn-ued btn-sm w-100" id="btnSolve">Tính CPA cần đạt</button></div>
+        </div>
+        <div id="solveOut" class="small mt-3"></div>
+    </div>
+</section>
 
 <section id="panel-gpa" class="tool-panel" hidden>
     <div class="card p-4 mb-3">

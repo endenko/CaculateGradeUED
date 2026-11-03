@@ -8,6 +8,7 @@ lại luồng tiêu thụ trong process đang phục vụ request.
 """
 from __future__ import annotations
 
+import json
 import os
 import threading
 import time
@@ -15,14 +16,18 @@ import traceback
 import uuid
 from collections import OrderedDict
 
-_PRIOR_SECONDS = float(os.environ.get("OCR_AVG_SECONDS", "20"))
+# Trước khi có mẫu thật, 6 giây nằm trong khoảng đo được (~1–14s), không phải 20/40/60.
+_PRIOR_SECONDS = float(os.environ.get("OCR_AVG_SECONDS", "6"))
+_TIMES_PATH = os.environ.get("OCR_TIMES_PATH", "/tmp/ued_ocr_times.json")
+_RECENT_LIMIT = 8
 
 
 class OcrQueue:
     def __init__(self):
         self._jobs = OrderedDict()
-        self._avg = _PRIOR_SECONDS
-        self._samples = 0
+        self._recent = _load_recent()
+        self._avg = _mean(self._recent) if self._recent else _PRIOR_SECONDS
+        self._samples = len(self._recent)
         self._runner = None
         self._thread = None
         self._rebuild_sync()
@@ -99,7 +104,7 @@ class OcrQueue:
                 ahead = 0
                 eta = max(1, int(self._avg - (time.time() - (job["started"] or time.time()))))
             elif job["status"] == "queued":
-                eta = int(round((ahead + 1) * self._avg))
+                eta = max(1, int(round((ahead + 1) * self._avg)))
             else:
                 eta = 0
             duration = None
@@ -162,9 +167,35 @@ class OcrQueue:
             job["error"] = error
             if error is None and job["started"]:
                 dur = max(0.05, finished - job["started"])
-                self._samples += 1
-                self._avg = dur if self._samples == 1 else (0.5 * self._avg + 0.5 * dur)
+                self._recent.append(dur)
+                self._recent = self._recent[-_RECENT_LIMIT:]
+                self._samples = len(self._recent)
+                self._avg = _mean(self._recent)
+                _save_recent(self._recent)
         _trim_memory()
+
+
+def _mean(values):
+    return sum(values) / len(values)
+
+
+def _load_recent():
+    try:
+        with open(_TIMES_PATH, encoding="utf-8") as handle:
+            data = json.load(handle)
+        if isinstance(data, list):
+            return [float(x) for x in data if float(x) > 0][-_RECENT_LIMIT:]
+    except (OSError, ValueError, TypeError):
+        return []
+    return []
+
+
+def _save_recent(values):
+    try:
+        with open(_TIMES_PATH, "w", encoding="utf-8") as handle:
+            json.dump([round(v, 3) for v in values[-_RECENT_LIMIT:]], handle)
+    except OSError:
+        pass
 
 
 def _trim_memory():

@@ -27,6 +27,7 @@ import db
 import newsfeed
 import ocr_queue
 import regulations
+import solver
 from ocr import engines
 from utils import no_accent_vietnamese, normalize
 from flask_limiter import Limiter
@@ -204,6 +205,9 @@ def auto_correct_universal(raw_name, mode, code=None, credit=None):
             dq, dn = re.findall(r'\d+', q), re.findall(r'\d+', n)
             if dq and dn and dq[-1] != dn[-1]:
                 sc -= 15
+            elif dq and dn and dq[-1] == dn[-1] and set(q.split()) <= set(n.split()):
+                # "giai tich 1" should beat "giai tich so" when the DB name contains those tokens.
+                sc += 22
             elif bool(dq) != bool(dn):
                 sc -= 6
             if credit is not None and subjects[idx]['tin_chi'] == credit:
@@ -221,73 +225,167 @@ def auto_correct_universal(raw_name, mode, code=None, credit=None):
 
 
 # ========================================================
-# 💻 PARSER MÁY TÍNH
+# 💻 PARSER MÁY TÍNH + DÒNG HỌC KỲ TRÊN PORTAL
 # ========================================================
+_SKIP_FOLDED = (
+    "trung binh", "tich luy", "ren luyen", "tong so", "so tin chi",
+    "diem hp", "ten hoc phan", "phuc khao", "chi tiet", "dvht",
+)
+
+
+def _fold_line(line):
+    return no_accent_vietnamese(line).lower()
+
+
+def extract_term(lines):
+    """Đọc 'Học kỳ: 2 - Năm học: 2024 - 2025'. Thiếu kỳ hoặc thiếu năm thì không đoán."""
+    folded = _fold_line("\n".join(lines or []))
+    hk = re.search(r"h\w{0,3}c\s*k[yi]\w*\s*[:\-]?\s*(he|\d)", folded)
+    nam = re.search(r"n\w{0,3}m\s*h\w{0,3}c\s*[:\-]?\s*(20\d{2})\s*-\s*(20\d{2})", folded)
+    if not hk or not nam:
+        return None
+    ky = hk.group(1)
+    if ky == "he":
+        hoc_ky = "he"
+    elif ky in ("1", "2"):
+        hoc_ky = ky
+    else:
+        return None
+    y1, y2 = int(nam.group(1)), int(nam.group(2))
+    if y2 != y1 + 1:
+        return None
+    return {"hoc_ky": hoc_ky, "nam_hoc": f"{y1}-{y2}"}
+
+
+def term_label(term):
+    if not term:
+        return "Không xác định được kỳ/năm"
+    ky = {"1": "1", "2": "2", "he": "hè"}.get(term.get("hoc_ky"), term.get("hoc_ky"))
+    return f"Học kỳ {ky} · {term.get('nam_hoc')}"
+
+
+def _grades_from_tail(tail):
+    """Điểm ở đuôi dòng portal: hệ 10 lần 1 [lần 2] rồi hệ 4 lần 1 [lần 2].
+
+    Có lần 2 thì lấy lần 2 (học lại). Không có điểm thập phân và không có chữ
+    thì là môn đang học, không gán F.
+    """
+    decimals = []
+    for raw in re.findall(r"\d+[\.,]\d+", tail or ""):
+        val = float(raw.replace(",", "."))
+        if 0 <= val <= 10:
+            decimals.append(val)
+    letters = [(m.group(1) + (m.group(2) or "")).upper()
+               for m in re.finditer(r"(?<![A-Z])([A-DF])(\+)?(?![A-Z])", tail or "", re.I)]
+    lan = 1
+    if len(decimals) >= 2:
+        score, lan = decimals[1], 2
+    elif len(decimals) == 1:
+        score = decimals[0]
+    else:
+        score = None
+    if len(letters) >= 2:
+        letter, lan = letters[-1], 2
+        if score is not None and quy_doi_chuan(score)[0] != letter[0]:
+            letter = quy_doi_chuan(score)
+    elif len(letters) == 1:
+        letter = letters[0]
+        if score is not None:
+            derived = quy_doi_chuan(score)
+            if derived[0] != letter[0] or len(derived) > len(letter):
+                letter = derived
+    elif score is not None:
+        letter = quy_doi_chuan(score)
+    else:
+        letter = None
+    return {
+        "diem_10": score,
+        "diem_he_4": letter,
+        "lan": lan if letter or score is not None else 1,
+        "in_progress": letter is None and score is None,
+    }
+
+
+def _skip_ocr_line(line):
+    folded = _fold_line(line)
+    if any(bit in folded for bit in _SKIP_FOLDED):
+        return True
+    if (re.search(r"h\w{0,3}c\s*k[yi]", folded) and re.search(r"20\d{2}\s*-\s*20\d{2}", folded)
+            and not re.search(r"\b\d{8}\b", line)):
+        return True
+    return False
+
+
+def _clean_raw_name(raw_name):
+    raw_name = re.sub(r'^\d+\s+\d{5,10}\s+', '', raw_name)
+    raw_name = re.sub(r'^\d{5,10}\s+', '', raw_name)
+    raw_name = re.sub(r'^\d+\s+', '', raw_name).strip()
+    return raw_name
+
+
+def _row_from_parts(raw_name, tin_chi, grades, line):
+    raw_name = _clean_raw_name(raw_name)
+    folded = _fold_line(raw_name)
+    if any(bit in folded for bit in ("trung binh", "tich luy", "ren luyen", "tong so")):
+        return None
+    if len(raw_name) < 2:
+        return None
+    code_m = re.search(r'\b(\d{8})\b', line)
+    credit = int(tin_chi) if str(tin_chi).isdigit() else None
+    ten_mon, pct, _db_credit = auto_correct_universal(
+        raw_name, 'computer', code_m.group(1) if code_m else None, credit=credit)
+    if len(ten_mon) < 2:
+        return None
+    return {
+        "raw_name": raw_name,
+        "ten_mon": ten_mon,
+        "percentage": pct,
+        "tin_chi": credit if credit else 3,
+        "diem_he_4": grades["diem_he_4"],
+        "diem_10": grades["diem_10"],
+        "lan": grades["lan"],
+        "in_progress": grades["in_progress"],
+        "ma_hp": code_m.group(1) if code_m else None,
+    }
+
+
 def parse_computer(lines):
     results = []
     pat_A = re.compile(r"(.+?)\s+(\d{2}[-.\s]\d{4})\s*(\d)\b")
     pat_B = re.compile(r"(.+?)\s+(\d)\s+(\d+[\.,]\d+)")
+    pat_score = re.compile(r"^(.+?)\s+([1-9])\s+(\d+[\.,]\d+)\s*([A-DF]\+?)?\s*$", re.I)
+    pat_letter = re.compile(r"^(.+?)\s+([1-9])\s+([A-DF]\+?|F)\s*$", re.I)
 
     for line in lines:
-        match = None
-        mode = "A"
+        line = line.strip()
+        if not line or _skip_ocr_line(line):
+            continue
         match = pat_A.search(line)
+        mode = "A"
         if not match:
             mode = "B"
             match = pat_B.search(line)
-
         if match:
             raw_name = match.group(1).strip()
-            tin_chi_ocr = match.group(3) if mode == "A" else match.group(2)
-            end_pos = match.end()
-
-            raw_name = re.sub(r'^\d+\s+\d{5,10}\s+', '', raw_name)
-            raw_name = re.sub(r'^\d{5,10}\s+', '', raw_name)
-            raw_name = re.sub(r'^\d+\s+', '', raw_name).strip()
-
-            name_check = no_accent_vietnamese(raw_name).lower()
-            blacklist = ["trung binh", "tich luy", "ren luyen", "tong so", "he 10", "he 4",
-                         "giao duc the chat", "quoc phong"]
-            if any(kw in name_check for kw in blacklist):
-                continue
-
-            phan_duoi = line[end_pos:]
-            diem_10_float = -1.0
-            match_diem_so = re.findall(r"(\d+[\.,]\d+)", phan_duoi)
-            if match_diem_so:
-                try:
-                    diem_10_float = float(match_diem_so[-1].replace(',', '.'))
-                except Exception:
-                    pass
-
-            match_diem_chu = re.search(r"([A-DF]\s*\+?|F)(?=\s|$|\*|\d)", phan_duoi, re.IGNORECASE)
-            diem_chu_ocr = match_diem_chu.group(1).upper().replace(" ", "") if match_diem_chu else 'F'
-
-            if diem_10_float != -1.0:
-                diem_chuan = quy_doi_chuan(diem_10_float)
-                if diem_chuan[0] != diem_chu_ocr[0]:
-                    diem_chu = diem_chuan
-                elif len(diem_chuan) > len(diem_chu_ocr):
-                    diem_chu = diem_chuan
-                else:
-                    diem_chu = diem_chu_ocr
-            else:
-                diem_chu = diem_chu_ocr
-
-            code_m = re.search(r'\b(\d{8})\b', line)
-            ten_mon_chuan, similarity_pct, db_credit = auto_correct_universal(
-                raw_name, 'computer', code_m.group(1) if code_m else None)
-            if len(ten_mon_chuan) < 2:
-                continue
-
-            results.append({
-                "raw_name": raw_name,
-                "ten_mon": ten_mon_chuan,
-                "percentage": similarity_pct,
-                "tin_chi": int(tin_chi_ocr),
-                "diem_he_4": diem_chu,
-                "diem_10": diem_10_float if 0 <= diem_10_float <= 10 else None,
-            })
+            tin_chi = match.group(3) if mode == "A" else match.group(2)
+            tail = line[match.end():]
+            if mode == "B":
+                tail = f"{match.group(3)} {tail}"
+            row = _row_from_parts(raw_name, tin_chi, _grades_from_tail(tail), line)
+            if row:
+                results.append(row)
+            continue
+        # Dòng ngắn kiểu "Giải tích 1  3  A" hoặc "Toán  3  8.5  A" — chỉ khi không phải dòng portal.
+        simple = pat_score.match(line) or pat_letter.match(line)
+        if not simple or re.search(r"\b\d{8}\b", line) or re.search(r"\d{2}-\d{4}", line):
+            continue
+        if simple.re is pat_score:
+            tail = simple.group(3) + " " + (simple.group(4) or "")
+        else:
+            tail = simple.group(3)
+        row = _row_from_parts(simple.group(1), simple.group(2), _grades_from_tail(tail), line)
+        if row:
+            results.append(row)
     return results
 
 
@@ -331,8 +429,33 @@ def _split_handwriting_line(line):
 def parse_handwriting(lines):
     results = []
 
+    pat_score = re.compile(r"^(.+?)\s+([1-9])\s+(\d+[\.,]\d+)\s*([A-DF]\+?)?\s*$", re.I)
+    pat_letter = re.compile(r"^(.+?)\s+([1-9])\s+([A-DF]\+?|F)\s*$", re.I)
+
     for line in lines:
         line = line.strip()
+        simple = pat_letter.match(line)
+        if simple and not re.search(r"\d+[\.,]\d+", line):
+            raw_name, tin_chi, letter = simple.group(1), simple.group(2), simple.group(3).upper()
+            ten_mon, pct, db_credit = auto_correct_universal(raw_name, 'handwriting', credit=int(tin_chi))
+            results.append({
+                "raw_name": raw_name.strip(),
+                "ten_mon": ten_mon,
+                "percentage": pct,
+                "tin_chi": int(tin_chi) if tin_chi else db_credit,
+                "diem_he_4": letter,
+                "diem_10": None,
+                "lan": 1,
+                "in_progress": False,
+            })
+            continue
+        scored = pat_score.match(line)
+        if scored:
+            line = f"{scored.group(1)} {scored.group(3)} {scored.group(4) or ''}".strip()
+            # giữ tín chỉ bằng cách nhét lại sau khi tách theo điểm
+            credit_hint = scored.group(2)
+        else:
+            credit_hint = None
         parts = _split_handwriting_line(line)
         if parts:
             raw_name_ocr, tin_chi_ocr, diem_10_str, phan_duoi = parts
@@ -350,7 +473,7 @@ def parse_handwriting(lines):
             ten_mon_chuan, similarity_pct, db_credit = auto_correct_universal(
                 raw_name_ocr, 'handwriting', credit=int(tin_chi_ocr) if tin_chi_ocr else None)
 
-            final_tin_chi = int(tin_chi_ocr) if tin_chi_ocr is not None else db_credit
+            final_tin_chi = int(credit_hint) if credit_hint else (int(tin_chi_ocr) if tin_chi_ocr is not None else db_credit)
 
             try:
                 diem_10 = float(diem_10_str.replace(',', '.'))
@@ -379,6 +502,8 @@ def parse_handwriting(lines):
                 "tin_chi": final_tin_chi,
                 "diem_he_4": final_diem_he_4,
                 "diem_10": diem_10 if 0 <= diem_10 <= 10 else None,
+                "lan": 1,
+                "in_progress": False,
             })
     return results
 
@@ -439,7 +564,18 @@ def _run_ocr_file(path, mode):
             lines = reconstruct_lines(word_list, mode)
             extracted_data = parse_computer(lines)
             engine = 'rapidocr-onnx' if engines.OCR_HANDWRITING_ENGINE == 'rapid' else ('tesseract' if engines._tesseract_is_available() else 'paddle-det+vietocr')
-        return {"success": True, "data": extracted_data, "engine": engine}
+        term = extract_term(lines)
+        for row in extracted_data:
+            row["hoc_ky"] = term["hoc_ky"] if term else None
+            row["nam_hoc"] = term["nam_hoc"] if term else None
+            row["term_unknown"] = term is None
+        return {
+            "success": True,
+            "data": extracted_data,
+            "engine": engine,
+            "term": term,
+            "term_label": term_label(term),
+        }
     except Exception as exc:
         return {"success": False, "error": str(exc)}
     finally:
@@ -537,6 +673,22 @@ def api_academics():
         return jsonify(regulations.summarize(request.get_json(force=True) or {}))
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
+
+
+@app.route('/api/semester_options', methods=['POST'])
+def api_semester_options():
+    data = request.get_json(force=True) or {}
+    try:
+        weights = tuple(data.get("weights") or (0.2, 0.3, 0.5))
+        options = solver.semester_options(
+            data.get("table2") or [],
+            float(data.get("target") or 3.2),
+            weights,
+            limit=5,
+        )
+    except (TypeError, ValueError) as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"options": options})
 
 
 @app.route('/api/components', methods=['POST'])

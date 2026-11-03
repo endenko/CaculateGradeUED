@@ -117,5 +117,26 @@ body{font-family:'Be Vietnam Pro',system-ui,sans-serif;background:linear-gradien
 .table-scroll table{margin-bottom:0}
 .table-scroll.table-wide table{min-width:36rem}
 .table-scroll thead th{position:sticky;top:0;z-index:2;background:var(--ued-blue)}
+.hp-editor{border:1px solid #d7e3f4;border-radius:14px;padding:1rem;background:#f8fbff;border-top:4px solid var(--ued-gold)}
+.hp-kicker{color:var(--ued-gold-dark);font-weight:800;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase}
+.hp-field{border-radius:12px;padding:.55rem .7rem;height:100%}
+.hp-field label{display:block;font-size:.72rem;font-weight:700;margin-bottom:.25rem;color:#3d4d63}
+.hp-field input,.hp-static{width:100%;border:1px solid #d6e0ee;border-radius:8px;padding:.35rem .5rem;background:#fff;font-weight:700}
+.tone-tc{background:#e8f0fb}.tone-bp{background:#fff6d6}.tone-gk{background:#e7f6ee}.tone-ck{background:#fff1e4}
+.ck-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.4rem}
+@media (max-width:576px){
+  .ck-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #panel-diemhp .table-wide table{min-width:0}
+  #panel-diemhp .hp-term{display:none}
+  #panel-diemhp .ued-table{font-size:.8rem}
+}
+.ck-cell{background:#fff;border-radius:8px;padding:.35rem .4rem;border:1px solid #e4ebf5;font-size:.78rem}
+.ck-cell b{display:block;color:var(--ued-blue)}
+.ck-cell.over{opacity:.55;background:#fdecea}
+.sem-target{border-top:1px solid #e4ebf5;padding-top:.8rem}
+.sem-options{min-height:8.5rem;margin-top:.6rem}
+.sem-option{padding:.55rem .2rem;border-bottom:1px solid #eef2f7}
+.sem-option .tag{font-weight:800;color:var(--ued-blue)}
+.btn-sua{border:1px solid var(--ued-blue);color:var(--ued-blue);background:#fff;border-radius:8px;font-weight:700;font-size:.78rem;padding:.2rem .55rem}
 .ued-footer{color:#6b7a90}.ued-footer a{color:var(--ued-blue);font-weight:600}
 @media (max-width:576px){.score-value{font-size:1.9rem}.ued-logo{width:64px;height:64px}}

@@ -258,6 +258,158 @@ def _pack(course, use_sim=False):
     }
 
 
+def _split_semester(table2, weights):
+    fixed, variable = [], []
+    for course in table2:
+        bp, gk, ck = course.get("bp"), course.get("gk"), course.get("ck")
+        if bp is not None and gk is not None and ck is None:
+            variable.append({
+                "id": course["id"], "ten_mon": course.get("ten_mon"),
+                "credits": course["credits"], "bp": bp, "gk": gk, "weights": weights,
+            })
+        elif course.get("points") is not None:
+            fixed.append(_pack(course))
+    return fixed, variable
+
+
+def _plan_from_choice(fixed, variable, choice):
+    """choice: list of (letter, minimum, points, ck) aligned with variable."""
+    rows = [{"credits": r["credits"], "points": r["points"]} for r in fixed]
+    courses = []
+    max_ck = 0.0
+    sum_ck = 0.0
+    any_over = False
+    for course, (letter, minimum, points, ck) in zip(variable, choice):
+        over = ck is None or ck > 10
+        if over:
+            any_over = True
+            shown = None
+        else:
+            max_ck = max(max_ck, ck)
+            sum_ck += ck
+            shown = ck
+        rows.append({"credits": course["credits"], "points": points})
+        courses.append({
+            "id": course["id"],
+            "ten_mon": course.get("ten_mon"),
+            "credits": course["credits"],
+            "letter": letter,
+            "min_ck": shown,
+            "ck_over": over,
+        })
+    stats = cpa(rows)
+    return {
+        "gpa": stats["cpa"],
+        "max_ck": None if any_over else max_ck,
+        "sum_ck": None if any_over else round(sum_ck, 1),
+        "feasible": (not any_over) and stats["cpa"] is not None,
+        "courses": courses,
+        "summary": ", ".join(f"{c['ten_mon']} {c['letter']}" for c in courses),
+    }
+
+
+def semester_options(table2, target, weights=(0.2, 0.3, 0.5), limit=5) -> list:
+    """Tối đa `limit` phương án chữ cho môn đang học, dễ nhất (CK thấp) trước."""
+    target = float(target)
+    weights = tuple(float(w) for w in weights)
+    if abs(sum(weights) - 1) > 0.001:
+        raise ValueError("Tổng trọng số phải bằng 1")
+    limit = max(1, min(int(limit), 5))
+    fixed, variable = _split_semester(table2, weights)
+    if not variable:
+        stats = cpa(fixed)
+        reached = stats["cpa"] is not None and stats["cpa"] + 1e-9 >= target
+        return [{
+            "gpa": stats["cpa"],
+            "max_ck": None,
+            "sum_ck": None,
+            "feasible": reached,
+            "courses": [],
+            "summary": "Không có môn đang chờ điểm cuối kỳ",
+            "label": "Đã đạt mốc" if reached else "Chưa đủ dữ liệu hoặc chưa đạt mốc",
+        }]
+
+    prepared = []
+    for course in variable:
+        opts = []
+        for letter, minimum, points in PLAN_LETTERS:
+            ck = _ck_for(course, minimum, weights)
+            opts.append((letter, float(minimum), float(points), ck))
+        prepared.append(opts)
+
+    found = []
+
+    def walk(i, acc):
+        if len(found) > 2500:
+            return
+        if i == len(prepared):
+            plan = _plan_from_choice(fixed, variable, acc)
+            if plan["feasible"] and plan["gpa"] + 1e-9 >= target:
+                found.append(plan)
+            return
+        for opt in prepared[i]:
+            acc.append(opt)
+            walk(i + 1, acc)
+            acc.pop()
+
+    if len(variable) <= 4:
+        walk(0, [])
+    else:
+        # Quá nhiều tổ hợp: lấy phương án gốc rồi đổi từng môn một bậc.
+        base = _assign(fixed, variable, weights, target)
+        seeds = [base["courses"]]
+        letters = [item[0] for item in PLAN_LETTERS]
+        for seed in list(seeds):
+            for idx, course in enumerate(variable):
+                cur = next(c for c in seed if c["id"] == course["id"])
+                pos = letters.index(cur["letter"]) if cur["letter"] in letters else len(letters) - 1
+                for delta in (-1, 1):
+                    npos = pos + delta
+                    if npos < 0 or npos >= len(letters):
+                        continue
+                    trial = []
+                    for course2, opt_list in zip(variable, prepared):
+                        if course2["id"] == course["id"]:
+                            picked = next(o for o in opt_list if o[0] == letters[npos])
+                        else:
+                            want = next(c["letter"] for c in seed if c["id"] == course2["id"])
+                            picked = next(o for o in opt_list if o[0] == want)
+                        trial.append(picked)
+                    plan = _plan_from_choice(fixed, variable, trial)
+                    if plan["feasible"] and plan["gpa"] + 1e-9 >= target:
+                        found.append(plan)
+        plan0_choice = []
+        for course, opt_list in zip(variable, prepared):
+            want = next(c for c in base["courses"] if c["id"] == course["id"])
+            plan0_choice.append(next(o for o in opt_list if o[0] == want["letter"]))
+        plan0 = _plan_from_choice(fixed, variable, plan0_choice)
+        if plan0["feasible"] and plan0["gpa"] + 1e-9 >= target:
+            found.append(plan0)
+
+    ranked = sorted(found, key=lambda p: (p["max_ck"], p["sum_ck"], -p["gpa"]))
+    out = []
+    seen = set()
+    for plan in ranked:
+        key = tuple((c["id"], c["letter"]) for c in plan["courses"])
+        if key in seen:
+            continue
+        seen.add(key)
+        plan["label"] = _label(plan["max_ck"], False)
+        out.append(plan)
+        if len(out) >= limit:
+            break
+    if out:
+        return out
+    # Không cách nào đạt: một phương án tất cả A để thấy CK vượt 10.
+    forced = []
+    for course, opt_list in zip(variable, prepared):
+        forced.append(opt_list[-1])
+    plan = _plan_from_choice(fixed, variable, forced)
+    plan["feasible"] = False
+    plan["label"] = "Bất khả thi trong kỳ này"
+    return [plan]
+
+
 def solve(table1, table2, target, scope="overall", weights=(0.2, 0.3, 0.5)) -> dict:
     """scope 'overall': CPA bảng 1 (kể cả giả lập) + bảng 2. 'semester': chỉ bảng 2.
 
