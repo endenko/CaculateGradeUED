@@ -39,6 +39,41 @@ class QueueTests(unittest.TestCase):
             os.unlink(a.name)
             os.unlink(b.name)
 
+    def test_consumer_survives_fork(self):
+        """gunicorn --preload (Render injects this) forks after the thread starts."""
+        q = ocr_queue.OcrQueue()
+
+        def runner(path, mode):
+            time.sleep(0.05)
+            return {"success": True, "data": [path], "engine": mode}
+
+        q.set_runner(runner)
+        self.assertTrue(q.worker_alive())
+        read_fd, write_fd = os.pipe()
+        pid = os.fork()
+        if pid == 0:
+            try:
+                os.close(read_fd)
+                ticket = q.submit("child-image", "computer")
+                deadline = time.time() + 3
+                state = "timeout"
+                while time.time() < deadline:
+                    info = q.status(ticket["id"])
+                    state = info["status"]
+                    if state in ("done", "error"):
+                        break
+                    time.sleep(0.02)
+                os.write(write_fd, state.encode())
+            except Exception as exc:  # noqa: BLE001
+                os.write(write_fd, ("exc:" + str(exc)).encode())
+            finally:
+                os._exit(0)
+        os.close(write_fd)
+        with os.fdopen(read_fd) as handle:
+            state = handle.read()
+        os.waitpid(pid, 0)
+        self.assertEqual(state, "done")
+
 
 if __name__ == "__main__":
     unittest.main()

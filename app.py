@@ -393,7 +393,12 @@ def home():
 
 @app.route('/health')
 def health():
-    return jsonify({"success": True, "status": "ok", "ocr": engines.engine_status()})
+    return jsonify({
+        "success": True,
+        "status": "ok",
+        "ocr": engines.engine_status(),
+        "queue_worker": ocr_queue.queue.worker_alive(),
+    })
 
 
 @app.route('/api/stats')

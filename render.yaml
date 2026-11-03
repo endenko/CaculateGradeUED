@@ -15,3 +15,8 @@ services:
         value: "2"
       - key: RAPID_LIMIT_SIDE
         value: "960"
+      # Render's hidden default is "--preload --access-logfile - --bind=...".
+      # Preload forks away the OCR thread. Override it; the app also restarts
+      # the consumer after fork if preload is turned back on.
+      - key: GUNICORN_CMD_ARGS
+        value: "--access-logfile -"

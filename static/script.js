@@ -148,6 +148,9 @@ async function pollOcr(id, queueBox) {
     for (let i = 0; i < 120; i++) {
         const res = await fetch('/api/ocr/jobs/' + id);
         const info = await res.json();
+        if (!res.ok || info.found === false) {
+            return { success: false, error: 'Phiên quét không còn (máy chủ vừa khởi động lại). Hãy gửi lại ảnh.' };
+        }
         if (queueBox) {
             if (info.status === 'queued') {
                 queueBox.textContent = `Hàng đợi: vị trí ${info.position}. Ước tính chờ khoảng ${info.eta_seconds} giây (ETA = số việc phía trước × ${info.avg_seconds}s).`;
