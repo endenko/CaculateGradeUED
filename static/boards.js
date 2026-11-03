@@ -71,34 +71,25 @@
     }
 
     function paint() {
-        const mount = document.getElementById('bang2Mount');
-        if (!mount) return;
+        const b2 = document.getElementById('panel-bang2');
+        const hp = document.getElementById('panel-diemhp');
+        const mt = document.getElementById('panel-muctieu');
+        if (!b2 || !hp || !mt) return;
         const keepTarget = (document.getElementById('solveTarget') || {}).value;
         const keepScope = (document.getElementById('solveScope') || {}).value;
         const w = weights();
         const empty2 = '<tr><td colspan="4" class="small text-muted">Chưa có môn. Tìm trong cơ sở dữ liệu hoặc quét ảnh và chọn Bảng 2.</td></tr>';
-        mount.innerHTML = `
-        <div class="swipe-pills" role="tablist">
-          <button type="button" class="nav-pill active" data-swipe="0">Bảng 2</button>
-          <button type="button" class="nav-pill" data-swipe="1">Điểm học phần</button>
-        </div>
-        <div class="swipe-dots">
-          <button type="button" class="swipe-dot active" data-dot="0" aria-label="Bảng 2"></button>
-          <button type="button" class="swipe-dot" data-dot="1" aria-label="Điểm học phần"></button>
-        </div>
-        <div class="swipe-row" id="semesterSwipe">
-          <div class="swipe-item swipe-list">
-            <div class="card p-3 mb-0">
+        b2.innerHTML = `
+            <div class="card p-3">
               <h5 class="section-title">Bảng 2 — học kỳ hiện tại</h5>
               ${searchBox(2)}
               <div class="table-scroll"><table class="table table-sm align-middle ued-table">
                 <thead><tr><th>Môn</th><th class="text-center">TC</th><th class="text-center">Chữ</th><th></th></tr></thead>
                 <tbody>${t2.map(row2List).join('') || empty2}</tbody>
               </table></div>
-            </div>
-          </div>
-          <div class="swipe-item swipe-scores">
-            <div class="card p-3 mb-0">
+            </div>`;
+        hp.innerHTML = `
+            <div class="card p-3">
               <h5 class="section-title">Điểm học phần</h5>
               <div class="row g-2 mb-2 small">
                 <div class="col-4"><label class="form-label small mb-1">BP / chuyên cần %</label><input id="wBp" class="form-control form-control-sm" type="number" min="0" max="100" value="${esc(savedWeight('wBp', 20))}"></div>
@@ -110,10 +101,9 @@
                 <thead><tr><th>Môn</th><th>BP</th><th>GK</th><th>CK</th><th class="text-center">Điểm</th><th class="text-center">Chữ</th><th class="text-center">Hệ 4</th></tr></thead>
                 <tbody>${t2.map(row2Parts).join('') || '<tr><td colspan="7" class="small text-muted">Thêm môn ở Bảng 2 để nhập điểm thành phần.</td></tr>'}</tbody>
               </table></div>
-            </div>
-          </div>
-        </div>
-        <div class="card p-3 mt-3" id="solverCard">
+            </div>`;
+        mt.innerHTML = `
+        <div class="card p-3" id="solverCard">
           <h5 class="section-title">Mục tiêu điểm</h5>
           <div class="row g-2 align-items-end">
             <div class="col-md-4"><label class="form-label small">Mốc</label>
@@ -131,7 +121,7 @@
           </div>
           <div id="solveOut" class="small mt-3"></div>
         </div>`;
-        bind(mount);
+        bind(document);
         if (keepTarget && document.getElementById('solveTarget')) document.getElementById('solveTarget').value = keepTarget;
         if (keepScope && document.getElementById('solveScope')) document.getElementById('solveScope').value = keepScope;
     }
@@ -166,22 +156,6 @@
             <td class="text-center">${c.points != null ? c.points : '—'}</td></tr>`;
     }
     function bind(mount) {
-        const scroller = mount.querySelector('.swipe-row');
-        const mark = (index) => {
-            mount.querySelectorAll('[data-swipe]').forEach((b, n) => b.classList.toggle('active', n === index));
-            mount.querySelectorAll('[data-dot]').forEach((b, n) => b.classList.toggle('active', n === index));
-        };
-        const go = (index) => {
-            if (!scroller) return;
-            scroller.scrollTo({ left: index * scroller.clientWidth, behavior: 'smooth' });
-            mark(index);
-        };
-        mount.querySelectorAll('[data-swipe]').forEach(b => b.addEventListener('click', () => go(+b.dataset.swipe)));
-        mount.querySelectorAll('[data-dot]').forEach(b => b.addEventListener('click', () => go(+b.dataset.dot)));
-        if (scroller) scroller.addEventListener('scroll', () => {
-            const index = Math.round(scroller.scrollLeft / Math.max(1, scroller.clientWidth));
-            mark(index);
-        }, { passive: true });
         mount.querySelectorAll('.board-search').forEach(input => {
             let timer;
             input.addEventListener('input', () => {
@@ -369,7 +343,7 @@
         if (String(target) === '1' && typeof saveData === 'function') saveData();
         paint();
         if (String(target) === '2') {
-            const tab = document.querySelector('[data-panel="hocphan"]');
+            const tab = document.querySelector('.site-menu [data-panel="bang2"]');
             if (tab) tab.click();
         }
     };

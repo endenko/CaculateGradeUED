@@ -19,12 +19,20 @@
 
     function showPanel(name) {
         document.querySelectorAll('.tool-panel').forEach(el => { el.hidden = el.id !== 'panel-' + name; });
-        document.querySelectorAll('.nav-pill').forEach(btn => btn.classList.toggle('active', btn.dataset.panel === name));
+        document.querySelectorAll('.site-menu [data-panel], .site-top [data-panel]').forEach(btn => btn.classList.toggle('active', btn.dataset.panel === name));
+        document.getElementById('siteMenu')?.classList.remove('open');
+        const menuBtn = document.getElementById('menuBtn');
+        if (menuBtn) menuBtn.setAttribute('aria-expanded', 'false');
         if (name === 'tintuc' && !newsCache) loadNews();
     }
 
-    document.querySelectorAll('.nav-pill').forEach(btn => {
+    document.querySelectorAll('[data-panel]').forEach(btn => {
         btn.addEventListener('click', () => showPanel(btn.dataset.panel));
+    });
+    document.getElementById('menuBtn')?.addEventListener('click', () => {
+        const menu = document.getElementById('siteMenu');
+        const open = menu.classList.toggle('open');
+        document.getElementById('menuBtn').setAttribute('aria-expanded', open ? 'true' : 'false');
     });
 
     function payload() {

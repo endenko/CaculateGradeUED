@@ -14,30 +14,35 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-<header class="ued-hero">
-    <div class="container d-flex flex-column flex-md-row align-items-center gap-3 py-4">
-        <img class="ued-logo" src="{{ url_for('static', filename='ued-logo.png') }}" alt="Biểu trưng Trường Đại học Sư phạm – Đại học Đà Nẵng">
-        <div class="text-center text-md-start flex-grow-1">
-            <div class="ued-kicker">ĐẠI HỌC ĐÀ NẴNG · TRƯỜNG ĐẠI HỌC SƯ PHẠM</div>
-            <h1 class="ued-title">UED Calculate Grade</h1>
-            <p class="ued-sub mb-0">Bảng điểm tích lũy · Điểm học phần học kỳ này · Điểm rèn luyện · Bảng tin</p>
-        </div>
-        <div class="ued-stats text-center" id="dbStats">
-            <div class="num" id="statSubjects">…</div><div class="lbl">môn học</div>
-            <div class="num mt-1" id="statFaculties">…</div><div class="lbl">khoa (2025)</div>
-        </div>
+<div class="site-top no-print">
+    <div class="container">
+        <a href="https://ued.udn.vn/" target="_blank" rel="noopener">Trang trường</a>
+        <a href="https://daotao.ued.udn.vn/" target="_blank" rel="noopener">Phòng Đào tạo</a>
+        <button type="button" data-panel="quydinh">Quy định</button>
+        <span class="top-stat"><span id="statSubjects">…</span> môn · <span id="statFaculties">…</span> khoa</span>
+    </div>
+</div>
+<header class="site-head">
+    <div class="container site-head-row">
+        <a class="brand" href="#bang-1" data-panel="bangdiem">
+            <img class="brand-logo" src="{{ url_for('static', filename='ued-logo.png') }}" alt="Biểu trưng Trường Đại học Sư phạm">
+            <span class="brand-text">
+                <span class="brand-uni">ĐẠI HỌC ĐÀ NẴNG</span>
+                <span class="brand-school">TRƯỜNG ĐẠI HỌC SƯ PHẠM</span>
+                <span class="brand-app">Tính điểm</span>
+            </span>
+        </a>
+        <button type="button" class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="siteMenu" aria-label="Mở menu">☰</button>
+        <nav class="site-menu" id="siteMenu" aria-label="Mục">
+            <button type="button" data-panel="bangdiem" class="active">Bảng 1</button>
+            <button type="button" data-panel="bang2">Bảng 2</button>
+            <button type="button" data-panel="diemhp">Điểm học phần</button>
+            <button type="button" data-panel="muctieu">Mục tiêu</button>
+            <button type="button" data-panel="drl">Điểm rèn luyện</button>
+            <button type="button" data-panel="tintuc">Bảng tin</button>
+        </nav>
     </div>
 </header>
-
-<nav class="ued-nav no-print" aria-label="Chức năng">
-    <div class="container d-flex gap-2 py-2">
-        <button type="button" class="nav-pill active" data-panel="bangdiem">Bảng điểm</button>
-        <button type="button" class="nav-pill" data-panel="hocphan">Điểm học phần</button>
-        <button type="button" class="nav-pill" data-panel="drl">Điểm rèn luyện</button>
-        <button type="button" class="nav-pill" data-panel="tintuc">Bảng tin tuần</button>
-        <button type="button" class="nav-pill" data-panel="quydinh">Nguồn quy định</button>
-    </div>
-</nav>
 <main class="container py-4">
 <section id="panel-bangdiem" class="tool-panel">
     <div class="row g-3 mb-4">
@@ -179,9 +184,9 @@
     </div>
 </section>
 
-<section id="panel-hocphan" class="tool-panel" hidden>
-    <div id="bang2Mount"></div>
-</section>
+<section id="panel-bang2" class="tool-panel" hidden></section>
+<section id="panel-diemhp" class="tool-panel" hidden></section>
+<section id="panel-muctieu" class="tool-panel" hidden></section>
 
 <section id="panel-gpa" class="tool-panel" hidden>
     <div class="card p-4 mb-3">
