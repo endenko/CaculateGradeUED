@@ -137,6 +137,26 @@ body{font-family:'Be Vietnam Pro',system-ui,sans-serif;background:linear-gradien
 .sem-options{min-height:8.5rem;margin-top:.6rem}
 .sem-option{padding:.55rem .2rem;border-bottom:1px solid #eef2f7}
 .cpa-outlook{min-height:11rem}
+.help-q{display:inline-flex;align-items:center;justify-content:center;width:1.15rem;height:1.15rem;margin-left:.35rem;border-radius:50%;border:1px solid var(--ued-gold-dark);background:var(--ued-gold-soft);color:var(--ued-blue-dark);font-size:.72rem;font-weight:800;line-height:1;vertical-align:middle}
+.guide-hint{display:flex;align-items:center;justify-content:space-between;gap:.75rem;background:var(--ued-gold-soft);border:1px solid var(--ued-gold);border-radius:12px;padding:.55rem .8rem;margin-bottom:1rem;color:var(--ued-blue-dark);font-size:.9rem}
+.guide-hint button[data-panel]{border:0;background:none;padding:0;font-weight:800;color:var(--ued-blue);text-decoration:underline}
+#dismissGuideHint{border:0;background:transparent;font-size:1.3rem;line-height:1;color:var(--ued-blue-dark);padding:.1rem .35rem}
+.guide-item{background:#fff;border-radius:14px;margin-bottom:.55rem;box-shadow:0 4px 18px rgba(11,78,162,.08);border-top:3px solid var(--ued-gold)}
+.guide-item summary{cursor:pointer;font-weight:800;color:var(--ued-blue);padding:.85rem 1rem;list-style:none}
+.guide-item summary::-webkit-details-marker{display:none}
+.guide-item summary::after{content:'▾';float:right;color:var(--ued-gold-dark)}
+.guide-item[open] summary::after{content:'▴'}
+.guide-body{padding:0 1rem .9rem;font-size:.92rem}
+.guide-body li{margin-bottom:.35rem}
+.guide-body h6{color:var(--ued-blue);font-weight:800;margin:1rem 0 .35rem;font-size:.95rem}
+.guide-fig{margin:.4rem 0 .9rem}
+.guide-fig img{width:100%;height:auto;border-radius:12px;border:1px solid #e4ebf5;background:#f4f7fb}
+.guide-fig figcaption{font-size:.8rem;color:#5c6b80;margin-top:.35rem}
+.guide-steps,.guide-compare{display:grid;grid-template-columns:1fr 1fr;gap:.7rem}
+.tag-ok,.tag-bad{display:inline-block;font-weight:800;border-radius:999px;padding:0 .45rem;font-size:.75rem;margin-right:.25rem}
+.tag-ok{background:#e5f6ea;color:#0b7a3e}
+.tag-bad{background:#fdecea;color:#a32020}
+@media (max-width:576px){.guide-body{font-size:.88rem}.guide-hint{align-items:flex-start}.guide-steps,.guide-compare{grid-template-columns:1fr}}
 .cpa-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.5rem;margin-bottom:.6rem}
 .cpa-stats div{background:#f8fbff;border-radius:10px;padding:.45rem .55rem}
 .cpa-stats b{display:block;font-size:1.15rem;color:var(--ued-blue-dark);line-height:1.2}

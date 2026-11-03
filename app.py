@@ -107,7 +107,46 @@ def reconstruct_lines_anchor(word_list):
     return lines
 
 
+def _phone_row_cut(gaps):
+    """Ngưỡng tách dòng cho ảnh điện thoại: khe trong một dòng nhỏ, khe giữa hai dòng lớn."""
+    import statistics
+    positive = sorted(gap for gap in gaps if gap >= 0.6)
+    if len(positive) < 4:
+        return 14.0
+    median = statistics.median(positive)
+    intra = [gap for gap in positive if gap <= max(median, 3.0) * 1.8]
+    typical = statistics.median(intra) if intra else median
+    big = [gap for gap in positive if gap >= max(8.0, typical * 2.8)]
+    if big:
+        return max(typical * 2.2, min(big) * 0.72)
+    return max(10.0, typical * 3.0)
+
+
+def reconstruct_lines_phone(word_list):
+    """Nhóm từ theo khoảng cách dọc. Không gộp cột lệch sang dòng kế bên như ảnh chụp màn hình."""
+    if not word_list:
+        return []
+    words = sorted(word_list, key=lambda item: item['y'])
+    gaps = [words[index + 1]['y'] - words[index]['y'] for index in range(len(words) - 1)]
+    cut = _phone_row_cut(gaps)
+    lines = []
+    current = [words[0]]
+    for word, gap in zip(words[1:], gaps):
+        if gap > cut:
+            current.sort(key=lambda item: item['x'])
+            lines.append(" ".join(item['text'] for item in current))
+            current = [word]
+        else:
+            current.append(word)
+    if current:
+        current.sort(key=lambda item: item['x'])
+        lines.append(" ".join(item['text'] for item in current))
+    return lines
+
+
 def reconstruct_lines(word_list, mode):
+    if mode == 'phone':
+        return reconstruct_lines_phone(word_list)
     if mode == 'handwriting':
         anchored = reconstruct_lines_anchor(list(word_list))
         if anchored:
@@ -554,16 +593,29 @@ def search_subject():
 
 
 def _run_ocr_file(path, mode):
+    prepared = None
     try:
-        if mode == 'handwriting':
-            word_list, engine = engines.handwriting_words(path)
+        from ocr.prepare import PhotoPrepareError, looks_like_phone_capture, prepare_exif_image, prepare_phone_image
+        use_phone = mode == 'phone' or (mode == 'computer' and looks_like_phone_capture(path))
+        if use_phone:
+            prepared = prepare_phone_image(path)
+            ocr_path = prepared
+        elif mode != 'handwriting':
+            prepared = prepare_exif_image(path)
+            ocr_path = prepared or path
+        else:
+            ocr_path = path
+        if mode == 'handwriting' and not use_phone:
+            word_list, engine = engines.handwriting_words(ocr_path)
             lines = reconstruct_lines(word_list, mode)
             extracted_data = parse_handwriting(lines)
         else:
-            word_list = engines.computer_words(path)
-            lines = reconstruct_lines(word_list, mode)
+            word_list = engines.computer_words(ocr_path)
+            lines = reconstruct_lines(word_list, 'phone' if use_phone else 'computer')
             extracted_data = parse_computer(lines)
             engine = 'rapidocr-onnx' if engines.OCR_HANDWRITING_ENGINE == 'rapid' else ('tesseract' if engines._tesseract_is_available() else 'paddle-det+vietocr')
+            if use_phone:
+                engine = engine + '+phone'
         term = extract_term(lines)
         for row in extracted_data:
             row["hoc_ky"] = term["hoc_ky"] if term else None
@@ -576,13 +628,18 @@ def _run_ocr_file(path, mode):
             "term": term,
             "term_label": term_label(term),
         }
+    except PhotoPrepareError as exc:
+        return {"success": False, "error": str(exc)}
     except Exception as exc:
         return {"success": False, "error": str(exc)}
     finally:
-        try:
-            os.remove(path)
-        except OSError:
-            pass
+        for leftover in (path, prepared):
+            if not leftover:
+                continue
+            try:
+                os.remove(leftover)
+            except OSError:
+                pass
 
 
 ocr_queue.queue.set_runner(_run_ocr_file)

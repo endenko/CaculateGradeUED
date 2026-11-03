@@ -176,7 +176,7 @@ function renderOCRReview(engine) {
         return `<tr class="${pct < 70 ? 'ocr-row-low' : ''}">
             <td><input type="checkbox" class="form-check-input ocr-chk" data-i="${i}" ${pct >= 55 ? 'checked' : ''}></td>
             <td><div class="fw-semibold">${escapeHtml(m.ten_mon)}</div><div class="small text-muted">OCR: ${escapeHtml(m.raw_name)}</div></td>
-            <td class="text-center">${m.tin_chi}</td><td class="text-center"><b>${m.diem_he_4}</b></td>
+            <td class="text-center">${m.tin_chi}</td><td class="text-center"><b>${m.in_progress ? '—' : escapeHtml(m.diem_he_4 || '')}</b></td>
             <td class="text-center"><span class="badge ${pct >= 80 ? 'bg-success' : pct >= 60 ? 'badge-gold' : 'bg-danger'}">${m.percentage}</span></td></tr>`;
     }).join('');
     box.innerHTML = `<div class="small text-muted mb-2">Engine: <b>${engine}</b> · Kiểm tra lại trước khi thêm (độ khớp &lt; 55% sẽ bỏ chọn).</div>

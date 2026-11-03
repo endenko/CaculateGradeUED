@@ -27,7 +27,20 @@
     }
 
     document.querySelectorAll('[data-panel]').forEach(btn => {
-        btn.addEventListener('click', () => showPanel(btn.dataset.panel));
+        btn.addEventListener('click', () => {
+            showPanel(btn.dataset.panel);
+            if (!btn.dataset.guide) return;
+            const item = document.getElementById('guide-' + btn.dataset.guide);
+            if (!item) return;
+            item.open = true;
+            item.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    });
+    const guideHint = document.getElementById('guideHint');
+    if (guideHint && localStorage.getItem('ued_guide_hint') !== 'off') guideHint.hidden = false;
+    document.getElementById('dismissGuideHint')?.addEventListener('click', () => {
+        localStorage.setItem('ued_guide_hint', 'off');
+        if (guideHint) guideHint.hidden = true;
     });
     document.getElementById('menuBtn')?.addEventListener('click', () => {
         const menu = document.getElementById('siteMenu');

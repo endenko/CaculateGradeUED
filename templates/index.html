@@ -41,10 +41,15 @@
             <button type="button" data-panel="muctieu">Mục tiêu</button>
             <button type="button" data-panel="drl">Điểm rèn luyện</button>
             <button type="button" data-panel="tintuc">Bảng tin</button>
+            <button type="button" data-panel="huongdan">Hướng dẫn</button>
         </nav>
     </div>
 </header>
 <main class="container py-4">
+<div id="guideHint" class="guide-hint no-print" hidden>
+    <span>Mới dùng? Mở <button type="button" data-panel="huongdan">Hướng dẫn</button> để xem cách quét bảng điểm và tính CPA.</span>
+    <button type="button" id="dismissGuideHint" aria-label="Đóng gợi ý">×</button>
+</div>
 <section id="panel-bangdiem" class="tool-panel">
     <div class="row g-3 mb-4">
         <div class="col-md-4"><div class="card score-box old">
@@ -127,7 +132,7 @@
 
             <div class="card p-4 mb-4">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="section-title mb-0"><i class="fas fa-camera"></i> Quét ảnh bảng điểm</h5>
+                    <h5 class="section-title mb-0"><i class="fas fa-camera"></i> Quét ảnh bảng điểm <button type="button" class="help-q" data-panel="huongdan" data-guide="quet" aria-label="Hướng dẫn quét ảnh">?</button></h5>
                     <span class="badge badge-gold" id="ocrLoading" style="display:none;">Đang nhận diện… <i class="fas fa-spinner fa-spin"></i></span>
                 </div>
                 <div class="d-flex flex-wrap gap-3 mb-2 small">
@@ -139,6 +144,8 @@
                 <div class="mode-switch mb-3" role="group">
                     <input type="radio" class="btn-check" name="ocrMode" id="modeComputer" value="computer" checked>
                     <label class="btn" for="modeComputer"><i class="fas fa-desktop"></i> Ảnh chụp Portal</label>
+                    <input type="radio" class="btn-check" name="ocrMode" id="modePhone" value="phone">
+                    <label class="btn" for="modePhone"><i class="fas fa-mobile-screen"></i> Ảnh điện thoại</label>
                     <input type="radio" class="btn-check" name="ocrMode" id="modeHand" value="handwriting">
                     <label class="btn" for="modeHand"><i class="fas fa-pen-fancy"></i> Ảnh viết tay</label>
                 </div>
@@ -146,16 +153,16 @@
                     <img id="ocrPreview" alt="" style="display:none;">
                     <div id="dropHint"><i class="fas fa-cloud-arrow-up fa-2x mb-2"></i><br>
                         Kéo thả ảnh vào đây hoặc <u>chọn ảnh</u><br>
-                        <small class="text-muted">OCR nhẹ RapidOCR khi máy chủ bật OCR_LIGHT=1. Ảnh được thu nhỏ trên máy bạn trước khi gửi.</small></div>
+                        <small class="text-muted">Ảnh điện thoại: cắt trong thư viện ảnh sao cho còn dòng Học kỳ / Năm học, cả bảng và phần tổng, rồi chọn <b>Ảnh điện thoại</b>. Ảnh HEIC (iPhone) gửi được. Cạnh dài hơn 2000 điểm ảnh được thu nhỏ trên máy bạn trước khi gửi.</small></div>
                 </label>
-                <input type="file" id="ocrFile" class="d-none" accept="image/*">
+                <input type="file" id="ocrFile" class="d-none" accept="image/*,.heic,.heif,image/heic,image/heif">
                 <button class="btn btn-ued-dark w-100 mt-3" onclick="uploadOCR()"><i class="fas fa-wand-magic-sparkles"></i> Quét ngay</button>
                 <div id="ocrReview" class="mt-3" style="display:none;"></div>
             </div>
 
             <div class="card p-4 mb-4">
                 <div class="d-flex flex-wrap gap-2 justify-content-between mb-3">
-                    <h5 class="section-title mb-0"><i class="fas fa-list-ul"></i> Điểm tổng — điểm tích lũy</h5>
+                    <h5 class="section-title mb-0"><i class="fas fa-list-ul"></i> Điểm tổng — điểm tích lũy <button type="button" class="help-q" data-panel="huongdan" data-guide="tong" aria-label="Hướng dẫn Điểm tổng">?</button></h5>
                     <div class="btn-group flex-wrap">
                         <button class="btn btn-sm btn-outline-ued" onclick="resetSimulation()">Reset giả lập</button>
                         <button class="btn btn-sm btn-outline-ued" onclick="exportTranscript()">Xuất JSON</button>
@@ -188,7 +195,7 @@
 <section id="panel-diemhp" class="tool-panel" hidden>
     <div class="card p-3 p-md-4 mb-3">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-            <h5 class="section-title mb-0"><i class="fas fa-table"></i> Điểm học phần</h5>
+            <h5 class="section-title mb-0"><i class="fas fa-table"></i> Điểm học phần <button type="button" class="help-q" data-panel="huongdan" data-guide="hp" aria-label="Hướng dẫn Điểm học phần">?</button></h5>
             <label class="small mb-0 d-flex align-items-center gap-2">Đang xem
                 <select id="semSelect" class="form-select form-select-sm" style="width:auto;min-width:14rem"></select>
             </label>
@@ -267,7 +274,7 @@
 <section id="panel-muctieu" class="tool-panel" hidden>
     <div class="card p-3 p-md-4">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
-            <h5 class="section-title mb-0">Mục tiêu CPA</h5>
+            <h5 class="section-title mb-0">Mục tiêu CPA <button type="button" class="help-q" data-panel="huongdan" data-guide="cpa" aria-label="Hướng dẫn mục tiêu CPA">?</button></h5>
             <label class="small mb-0 d-flex align-items-center gap-2">Mốc
                 <select id="solveTarget" class="form-select form-select-sm" style="width:auto">
                     <option value="3.6">Xuất sắc 3,6</option>
@@ -296,7 +303,7 @@
 
 <section id="panel-drl" class="tool-panel" hidden>
     <div class="card p-4">
-        <h5 class="section-title">Điểm rèn luyện</h5>
+        <h5 class="section-title">Điểm rèn luyện <button type="button" class="help-q" data-panel="huongdan" data-guide="drl" aria-label="Hướng dẫn điểm rèn luyện">?</button></h5>
         <p class="small text-muted">Các ý và điểm tối đa lấy từ phiếu tự đánh giá mẫu B01.QT824-02, học kỳ Thu 2025–2026, chấm theo Quyết định 3758/QĐ-ĐHĐN (hướng dẫn Thông tư 16/2015). Xếp loại 90/80/65/50/35 lấy từ Điều 9 thông tư vì phiếu không in lại các mốc đó. Mỗi ô không vượt điểm ghi trên phiếu.</p>
         <div class="row g-3" id="drlFields">
             <div class="col-md-6"><label class="form-label small">Ý thức học tập (0–20) · Điều 4</label><input class="form-control" id="drl_hoc_tap" type="number" min="0" max="20" value="0"></div>
@@ -323,7 +330,7 @@
 <section id="panel-tintuc" class="tool-panel" hidden>
     <div class="card p-4 mb-3">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <h5 class="section-title mb-0">Bảng tin tuần</h5>
+            <h5 class="section-title mb-0">Bảng tin tuần <button type="button" class="help-q" data-panel="huongdan" data-guide="tin" aria-label="Hướng dẫn bảng tin">?</button></h5>
             <button type="button" class="btn btn-sm btn-outline-ued" id="btnReloadNews">Tải lại</button>
         </div>
         <p class="small text-muted">Lấy bài công khai trên <a href="https://ued.udn.vn/" target="_blank" rel="noopener">ued.udn.vn</a> qua WordPress REST: bài mới và các chuyên mục Thông báo đào tạo, Thông báo người học, Lịch thi, Lịch tuần, Chế độ chính sách. Không có trang quản trị, không bài đăng tay. Cache trên máy chủ khoảng 30 phút; đĩa gói Render free mất khi dịch vụ ngủ hoặc deploy lại, khi đó trang tự tải lại.</p>
@@ -347,6 +354,188 @@
             </div>
         </div>
     </div>
+</section>
+
+<section id="panel-huongdan" class="tool-panel" hidden>
+    <div class="card p-3 p-md-4 mb-3">
+        <h5 class="section-title">Hướng dẫn</h5>
+        <p class="small text-muted mb-0">Mỗi mục nói việc trang làm được và các bước bấm. Bấm dòng để mở. Dấu ? trên từng phần cũng nhảy tới đây.</p>
+    </div>
+    <details class="guide-item" id="guide-quet" open>
+        <summary>Quét ảnh</summary>
+        <div class="guide-body">
+            <p>Lấy bảng điểm trên QLHT, cắt đúng vùng, rồi đưa ảnh vào trang này. Máy đọc chữ, bạn kiểm tra rồi mới thêm vào bảng.</p>
+            <h6>1. Mở QLHT</h6>
+            <p>QLHT là cổng điểm của trường: <a href="https://qlht.ued.udn.vn/" target="_blank" rel="noopener">qlht.ued.udn.vn</a>.</p>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/step-mo-qlht.png') }}" alt="Trình duyệt mở địa chỉ qlht.ued.udn.vn">
+                <figcaption>Bước 1. Gõ địa chỉ trên, không dùng trang khác.</figcaption>
+            </figure>
+            <h6>2. Đăng nhập</h6>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/step-dang-nhap.png') }}" alt="Sơ đồ ô tài khoản, mật khẩu và nút đăng nhập">
+                <figcaption>Bước 2. Điền tài khoản sinh viên rồi bấm đăng nhập. Hình là sơ đồ, không phải màn hình thật của QLHT.</figcaption>
+            </figure>
+            <h6>3. Vào Bảng điểm hoặc Kết quả học tập</h6>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/step-bang-diem.png') }}" alt="Hai tên mục cần mở: Bảng điểm và Kết quả học tập">
+                <figcaption>Bước 3. Mở mục bảng điểm. Trên QLHT mục đó mang một trong hai tên này.</figcaption>
+            </figure>
+            <h6>4. Chọn học kỳ</h6>
+            <figure class="guide-fig">
+                <img src="{{ url_for('static', filename='guide/step-chon-ky.png') }}" alt="Ô chọn Học kỳ 2 năm học 2024-2025">
+                <figcaption>Bước 4. Chọn kỳ bạn cần. Dòng Học kỳ / Năm học phải hiện trên trang trước khi chụp.</figcaption>
+            </figure>
+            <h6>5. Chụp và cắt</h6>
+            <div class="guide-steps">
+                <figure class="guide-fig">
+                    <img src="{{ url_for('static', filename='guide/step-cat-may.png') }}" alt="Khung trình duyệt, viền vàng quanh bảng điểm, phím tắt Windows và Mac">
+                    <figcaption>Máy tính: Snipping Tool với Win+Shift+S, hoặc Cmd+Shift+4 trên Mac. Viền vàng là vùng cần giữ.</figcaption>
+                </figure>
+                <figure class="guide-fig">
+                    <img src="{{ url_for('static', filename='guide/step-cat-dienthoai.png') }}" alt="Khung điện thoại, ảnh bảng điểm và các góc cắt">
+                    <figcaption>Điện thoại: chụp màn hình, rồi cắt trong ứng dụng ảnh. Giữ dòng học kỳ, cả bảng và phần tổng.</figcaption>
+                </figure>
+            </div>
+            <h6>Cắt đúng và cắt sai</h6>
+            <p>Ảnh mẫu là bảng Học kỳ 2, năm học 2024-2025. Vòng đỏ trên ảnh chỉ chỗ dòng học kỳ — khi tự cắt bạn không cần vẽ vòng.</p>
+            <div class="guide-compare">
+                <figure class="guide-fig">
+                    <img src="{{ url_for('static', filename='guide/crop-dung.png') }}" alt="Ảnh cắt đúng: còn dòng học kỳ, đủ cột và phần tổng">
+                    <figcaption><span class="tag-ok">Đúng</span> Còn dòng Học kỳ / Năm học, đủ cột, và khối tổng ở dưới.</figcaption>
+                </figure>
+                <figure class="guide-fig">
+                    <img src="{{ url_for('static', filename='guide/crop-sai-header.png') }}" alt="Ảnh cắt sai vì mất phần trên của dòng học kỳ">
+                    <figcaption><span class="tag-bad">Sai</span> Cụt dòng Học kỳ / Năm học. Trang không đoán kỳ.</figcaption>
+                </figure>
+                <figure class="guide-fig">
+                    <img src="{{ url_for('static', filename='guide/crop-sai-cot.png') }}" alt="Ảnh cắt sai vì mất các cột điểm bên phải">
+                    <figcaption><span class="tag-bad">Sai</span> Cụt cột. Thiếu điểm lần 1, lần 2 thì môn đọc sót.</figcaption>
+                </figure>
+                <figure class="guide-fig">
+                    <img src="{{ url_for('static', filename='guide/crop-sai-mo.png') }}" alt="Ảnh cắt sai vì bị mờ">
+                    <figcaption><span class="tag-bad">Sai</span> Mờ, lóa, nghiêng mạnh. Chụp lại, để màn hình thẳng và đủ sáng.</figcaption>
+                </figure>
+            </div>
+            <h6>6. Đưa ảnh vào trang này</h6>
+            <ol>
+                <li>Chọn <b>Ảnh chụp Portal</b> khi ảnh là màn hình máy tính, rõ, thẳng. Chọn <b>Ảnh điện thoại</b> khi là ảnh chụp màn hình điện thoại hoặc ảnh máy ảnh chụp màn hình (nghiêng, lóa, HEIC). Chọn <b>Ảnh viết tay</b> chỉ khi tờ giấy là chữ viết.</li>
+                <li>Kéo ảnh vào ô hoặc bấm chọn ảnh. Ảnh cạnh dài hơn 2000 điểm ảnh được thu nhỏ trên máy bạn trước khi gửi. iPhone gửi được HEIC; nếu máy chủ không đọc được định dạng đó, trang báo và hướng dẫn lưu JPEG.</li>
+                <li>Bấm <b>Quét ngay</b>. Ảnh xếp hàng, mỗi lúc máy chỉ đọc một ảnh. Trang hiện vị trí và số giây ước tính (trung bình vài lần quét gần nhất; lần đầu khoảng 24 giây). Mỗi máy được 5 ảnh mỗi phút và 30 ảnh mỗi giờ. Hàng đầy 20 ảnh thì phải đợi.</li>
+                <li>Xem lại từng dòng. Dòng khớp dưới 55% bỏ chọn sẵn. Giữ hoặc bỏ dấu tick, rồi bấm thêm các môn đã chọn.</li>
+            </ol>
+            <div class="guide-steps">
+                <figure class="guide-fig">
+                    <img src="{{ url_for('static', filename='guide/app-upload.png') }}" alt="Ô tải ảnh với chế độ Ảnh điện thoại được chọn">
+                    <figcaption>Chọn chế độ, thấy dòng nhắc cắt ảnh điện thoại, rồi bấm Quét ngay.</figcaption>
+                </figure>
+                <figure class="guide-fig">
+                    <img src="{{ url_for('static', filename='guide/app-queue.png') }}" alt="Dòng trạng thái hàng đợi khi đang quét">
+                    <figcaption>Đợi hàng. Trang ghi vị trí và số giây ước tính.</figcaption>
+                </figure>
+                <figure class="guide-fig">
+                    <img src="{{ url_for('static', filename='guide/app-review.png') }}" alt="Bảng kiểm tra từng môn trước khi thêm">
+                    <figcaption>Kiểm tra môn, tín chỉ, điểm. Bỏ dòng sai rồi xác nhận.</figcaption>
+                </figure>
+                <figure class="guide-fig">
+                    <img src="{{ url_for('static', filename='guide/app-diemhp.png') }}" alt="Điểm học phần sau khi thêm môn từ ảnh">
+                    <figcaption>Điểm học phần nhận mọi môn của kỳ, kể cả môn chưa có điểm.</figcaption>
+                </figure>
+                <figure class="guide-fig">
+                    <img src="{{ url_for('static', filename='guide/app-diemtong.png') }}" alt="Điểm tổng sau khi thêm các môn đã có điểm">
+                    <figcaption>Điểm tổng chỉ nhận môn đã có điểm chữ.</figcaption>
+                </figure>
+            </div>
+            <p>Nếu ảnh có dòng học kỳ và năm học, các môn vào đúng kỳ đó. Nếu dòng bị cắt hoặc không đọc được, kỳ ghi <b>Không xác định được kỳ/năm</b>. Sang Điểm học phần, chọn năm và học kỳ rồi bấm <b>Gán kỳ cho môn đang xem</b>.</p>
+            <p>Môn đã có điểm chữ vào cả Điểm học phần của kỳ đó và Điểm tổng. Môn chưa có điểm (ô trống, đang học) chỉ vào Điểm học phần để bạn nhập điểm thành phần. Ảnh trên máy chủ bị xóa ngay sau khi đọc xong.</p>
+        </div>
+    </details>
+    <details class="guide-item" id="guide-tong">
+        <summary>Điểm tổng</summary>
+        <div class="guide-body">
+            <p>Bảng điểm các môn đã có điểm, dùng để xem CPA và thử học lại.</p>
+            <ol>
+                <li>Thêm tay: chọn khoa nếu muốn lọc, gõ tên hoặc mã, chọn môn trong gợi ý, nhập tín chỉ và điểm hệ 10 (ô hệ chữ tự đổi), chọn năm học, học kỳ, lần học. Dấu “chỉ đạt/không đạt” là điểm P, không vào CPA.</li>
+                <li>Ba ô trên cùng là CPA đang có, CPA giả lập, và chênh lệch. Cột <b>Giả lập học lại</b> đổi điểm tạm để xem CPA mới, không xóa điểm thật. <b>Reset giả lập</b> trả các ô về Giữ.</li>
+                <li>Môn từ 3 tín chỉ, điểm C, D+, D hoặc F được tô đỏ.</li>
+                <li>Thanh tiến độ dùng ô tổng tín chỉ (mặc định 130, bạn sửa nếu chương trình khác).</li>
+                <li><b>Xuất JSON</b> tải file danh sách môn. <b>In</b> in trang. <b>Xóa hết</b> xóa Điểm tổng trên trình duyệt này, sau khi hỏi lại. Không xóa Điểm học phần.</li>
+            </ol>
+        </div>
+    </details>
+    <details class="guide-item" id="guide-hp">
+        <summary>Điểm học phần</summary>
+        <div class="guide-body">
+            <p>Bảng một học kỳ: môn đã có điểm và môn đang học.</p>
+            <ol>
+                <li><b>Đang xem</b> liệt kê các kỳ đã có môn. Đổi năm học hoặc học kỳ bên trái cũng chuyển kỳ đang xem.</li>
+                <li>Thêm môn chưa có điểm: gõ tên, chọn gợi ý, bấm <b>Thêm môn (chưa có điểm)</b>. Môn vào kỳ đang xem.</li>
+                <li>Ba ô phần trăm là trọng số bộ phận, giữa kỳ, cuối kỳ. Mặc định 20, 30, 50. Đổi nếu đề cương môn khác. Tổng nên bằng 100.</li>
+                <li>Bấm <b>Sửa</b> trên một dòng. Nhập điểm bộ phận và giữa kỳ, để trống cuối kỳ nếu chưa thi. Bảng dưới liệt kê điểm cuối kỳ tối thiểu cho từng chữ A+ đến D. Ô nào ghi không đạt (&gt;10) là mức đó không với tới. <b>Xem kết quả</b> khi đã có đủ ba cột. <b>Xóa trắng</b> xóa ba ô thành phần.</li>
+                <li>Phía dưới, chọn mốc Xuất sắc 3,6 / Giỏi 3,2 / Khá 2,5. Trang liệt kê tối đa 5 phương án chữ cho các môn đang chờ cuối kỳ, cách dễ trước. Đổi mốc thì chỉ danh sách này đổi.</li>
+            </ol>
+        </div>
+    </details>
+    <details class="guide-item" id="guide-cpa">
+        <summary>Mục tiêu CPA</summary>
+        <div class="guide-body">
+            <p>Xem CPA từ Điểm tổng cộng với các môn đang học của kỳ đang xem. Môn đã có điểm ở cả hai nơi chỉ tính một lần.</p>
+            <ol>
+                <li>Chọn mốc. Trang tính ngay, không cần bấm thêm.</li>
+                <li>Bốn ô: CPA hiện tại, số tín chỉ đang tính, mốc, và thiếu hoặc vượt bao nhiêu. Thanh phía dưới là CPA so với mốc.</li>
+                <li>Nếu kỳ đang xem còn môn chưa có điểm cuối, trang đưa tối đa 5 cách xếp chữ để tới mốc. Nếu điểm cao nhất các môn đó vẫn không tới, trang nói CPA cao nhất đạt được.</li>
+                <li>Nếu không còn môn đang học, trang ước lượng cần thêm bao nhiêu tín chỉ điểm A (4,0) hoặc B+ (3,5). B+ không được nêu khi 3,5 thấp hơn mốc. Nếu đã vượt mốc, trang nói còn thêm được bao nhiêu tín chỉ điểm B hoặc C trước khi tụt xuống.</li>
+            </ol>
+            <p>Hạng xuất sắc hoặc giỏi bị hạ một bậc chỉ khi tín chỉ học từ lần 2 trở đi vượt 5% tổng tín chỉ chương trình (ô trên Điểm tổng, mặc định 130). Đó là QĐ 1586 Điều 13 và QĐ 1473 Điều 25. Chưa đủ điều kiện thì trang không nhắc.</p>
+        </div>
+    </details>
+    <details class="guide-item" id="guide-drl">
+        <summary>Điểm rèn luyện</summary>
+        <div class="guide-body">
+            <p>Cộng điểm phiếu tự đánh giá. Các ý và điểm tối đa lấy từ mẫu B01.QT824-02, học kỳ Thu 2025–2026, theo Quyết định 3758/QĐ-ĐHĐN (hướng dẫn Thông tư 16/2015).</p>
+            <ol>
+                <li>Nhập từng ý, không quá điểm ghi bên cạnh. Ý ĐTBCHK chỉ chọn một mức.</li>
+                <li>Chọn kỷ luật đang chịu, nếu có. Khiển trách không xếp quá Khá, cảnh cáo không xếp quá Trung bình, đình chỉ hoặc buộc thôi học thì không đánh giá.</li>
+                <li>Bấm <b>Xếp loại</b>. Mốc: 90 xuất sắc, 80 tốt, 65 khá, 50 trung bình, 35 yếu, dưới 35 kém (Điều 9 thông tư).</li>
+            </ol>
+            <p>Số bạn gõ không được lưu. Tải lại trang là mất. Trang không tự kết luận “hai kỳ liên tiếp yếu” vì chỉ có một lần chấm.</p>
+        </div>
+    </details>
+    <details class="guide-item" id="guide-tin">
+        <summary>Bảng tin</summary>
+        <div class="guide-body">
+            <p>Tin công khai trên ued.udn.vn. Không có chỗ đăng bài trên trang này.</p>
+            <ol>
+                <li>Mở tab Bảng tin. Bài được kéo về và chia nhóm (tất cả, thạc sĩ, học tập, tiếng Anh, quốc phòng, học bổng, khác).</li>
+                <li>Bấm tiêu đề để mở bài gốc. <b>Tải lại</b> xin bản mới.</li>
+                <li>Ô lịch chỉ lấy ngày viết đủ kiểu ngày/tháng/năm đứng gần chữ hạn, đăng ký, thi, nộp. Bài không ghi đủ ngày thì không có mục.</li>
+                <li>Khung Facebook là trang nhà trường nhúng sẵn. Trang không đọc được bài fanpage khi bạn chưa đăng nhập Facebook.</li>
+            </ol>
+            <p>Máy chủ giữ bản tin khoảng 30 phút. Bản trên đĩa mất khi dịch vụ ngủ hoặc được đưa bản mới lên, khi đó trang tải lại.</p>
+        </div>
+    </details>
+    <details class="guide-item" id="guide-data">
+        <summary>Dữ liệu nằm ở đâu, xóa thế nào</summary>
+        <div class="guide-body">
+            <p>Điểm tổng, Điểm học phần và trọng số 20/30/50 nằm trong trình duyệt này (localStorage), không gửi lên tài khoản. Máy khác hoặc trình duyệt khác không thấy. Xóa dữ liệu trang web của trình duyệt là mất hết.</p>
+            <ul>
+                <li>Điểm tổng: nút <b>Xóa hết</b>. Hỏi lại trước khi xóa.</li>
+                <li>Cột giả lập: <b>Reset giả lập</b>.</li>
+                <li>Điểm học phần: nút × trên từng dòng. Không có một nút xóa cả kỳ.</li>
+                <li>Điểm rèn luyện: không lưu.</li>
+                <li>Ảnh vừa quét: máy chủ xóa file sau khi đọc.</li>
+                <li>Danh sách môn để gõ tìm: nằm trên máy chủ, lấy từ CTĐT đã đưa vào trang.</li>
+                <li>Bảng tin: bản nhớ tạm trên máy chủ, khoảng 30 phút.</li>
+            </ul>
+        </div>
+    </details>
+    <details class="guide-item" id="guide-scale">
+        <summary>Thang điểm và nguồn</summary>
+        <div class="guide-body">
+            <p>Chữ dùng trong bảng, theo Quyết định 1586 (khóa 2021 trở đi): A+ từ 9,5 và A từ 8,5 đều 4,0; B+ từ 8,0 là 3,5; B từ 7,0 là 3,0; C+ từ 6,5 là 2,5; C từ 5,5 là 2,0; D+ từ 5,0 là 1,5; D từ 4,0 là 1,0; dưới 4,0 là F = 0. CPA làm tròn 2 chữ số. P không vào CPA.</p>
+            <p>Chân trang ghi nguồn môn là CTĐT khóa 2025 trên ued.udn.vn, nguồn điểm là Thông tư 08/2021 và QĐ 1473/QĐ-ĐHSP-ĐT. QĐ 1473 (khóa 2020 trở về trước) không có A+ và B+. Phần <button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-panel="quydinh">Quy định</button> trên thanh xanh liệt kê điều đã đối chiếu và chỗ chưa đọc được toàn văn, không dùng làm ngưỡng.</p>
+        </div>
+    </details>
 </section>
 
 <section id="panel-quydinh" class="tool-panel" hidden>
