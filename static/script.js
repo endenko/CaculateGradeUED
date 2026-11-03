@@ -155,7 +155,14 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('statSubjects').innerText = st.subjects;
         document.getElementById('statFaculties').innerText = st.faculties.length;
         const sel = document.getElementById('khoaFilter');
-        st.faculties.forEach(f => { const o = document.createElement('option'); o.value = f.khoa; o.textContent = `${f.khoa} (${f.so_mon})`; sel.appendChild(o); });
+        const g1 = document.createElement('optgroup'); g1.label = 'Khoa hiện nay (2025)';
+        st.faculties.forEach(f => { const o = document.createElement('option'); o.value = f.khoa; o.textContent = `${f.khoa} (${f.so_mon})`; g1.appendChild(o); });
+        sel.appendChild(g1);
+        if (st.faculties_old && st.faculties_old.length) {
+            const g2 = document.createElement('optgroup'); g2.label = 'Khoa trước sáp nhập (≤2024)';
+            st.faculties_old.forEach(f => { const o = document.createElement('option'); o.value = f.khoa; o.textContent = `${f.khoa} (${f.so_mon})`; g2.appendChild(o); });
+            sel.appendChild(g2);
+        }
     }).catch(() => {});
 });
 

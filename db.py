@@ -50,14 +50,18 @@ def init_db():
                 ten_mon TEXT NOT NULL,
                 tin_chi INTEGER,
                 khoa    TEXT,
+                khoa_cu TEXT,
                 nganh   TEXT,
                 nguon   TEXT,
                 PRIMARY KEY (ma_hp, nganh, ten_mon)
             );
             CREATE INDEX IF NOT EXISTS ix_hp_ten ON hoc_phan(ten_mon);
         """)
+        hp_cols = {r[1] for r in conn.execute("PRAGMA table_info(hoc_phan)")}
+        if 'khoa_cu' not in hp_cols:
+            conn.execute("ALTER TABLE hoc_phan ADD COLUMN khoa_cu TEXT")
         cols = {r[1] for r in conn.execute("PRAGMA table_info(danh_muc_mon)")}
-        for col in ('ma_hp', 'khoa', 'so_nganh'):
+        for col in ('ma_hp', 'khoa', 'so_nganh', 'khoa_cu'):
             if col not in cols:
                 conn.execute(f"ALTER TABLE danh_muc_mon ADD COLUMN {col} TEXT")
         conn.commit()
@@ -81,10 +85,10 @@ def seed_from_csv(csv_path=SEED_CSV, ued_csv=UED_CSV):
         conn.execute("DELETE FROM danh_muc_mon")
         n_hp = 0
         for r in _read_csv(ued_csv):
-            conn.execute("INSERT OR IGNORE INTO hoc_phan VALUES (?,?,?,?,?,?)",
+            conn.execute("INSERT OR IGNORE INTO hoc_phan (ma_hp,ten_mon,tin_chi,khoa,khoa_cu,nganh,nguon) VALUES (?,?,?,?,?,?,?)",
                          (r['ma_hp'] or None, r['ten_mon'].strip(),
                           int(r['tin_chi']) if r['tin_chi'] else None,
-                          r['khoa'], r['nganh'], r['nguon']))
+                          r['khoa'], r.get('khoa_cu', ''), r['nganh'], r['nguon']))
             n_hp += 1
         # original list (khoa Tin) kept as-is
         for r in _read_csv(csv_path):
@@ -92,8 +96,8 @@ def seed_from_csv(csv_path=SEED_CSV, ued_csv=UED_CSV):
                 tc = int(float(r.get('tin_chi') or 3))
             except ValueError:
                 tc = 3
-            conn.execute("INSERT OR IGNORE INTO hoc_phan VALUES (?,?,?,?,?,?)",
-                         (None, r['ten_mon'].strip(), tc, 'Tin học (danh sách gốc)', '', 'repo gốc'))
+            conn.execute("INSERT OR IGNORE INTO hoc_phan (ma_hp,ten_mon,tin_chi,khoa,khoa_cu,nganh,nguon) VALUES (?,?,?,?,?,?,?)",
+                         (None, r['ten_mon'].strip(), tc, 'Toán – Tin', 'Tin học', 'Danh sách gốc (repo)', 'repo gốc'))
         # unique-name view used by fuzzy matching
         groups = defaultdict(list)
         for row in conn.execute("SELECT * FROM hoc_phan"):
@@ -103,10 +107,12 @@ def seed_from_csv(csv_path=SEED_CSV, ued_csv=UED_CSV):
             tc = credits.most_common(1)[0][0] if credits else 3
             codes = Counter(r['ma_hp'] for r in rows if r['ma_hp'])
             khoa = Counter(r['khoa'] for r in rows if r['khoa'])
-            conn.execute("INSERT OR REPLACE INTO danh_muc_mon (ten_mon,tin_chi,ma_hp,khoa,so_nganh) VALUES (?,?,?,?,?)",
+            kcu = Counter(r['khoa_cu'] for r in rows if r['khoa_cu'])
+            conn.execute("INSERT OR REPLACE INTO danh_muc_mon (ten_mon,tin_chi,ma_hp,khoa,so_nganh,khoa_cu) VALUES (?,?,?,?,?,?)",
                          (name, tc, codes.most_common(1)[0][0] if codes else None,
                           khoa.most_common(1)[0][0] if khoa else None,
-                          str(len({r['nganh'] for r in rows}))))
+                          str(len({r['nganh'] for r in rows})),
+                          kcu.most_common(1)[0][0] if kcu else None))
         conn.commit()
         total = conn.execute("SELECT COUNT(*) FROM danh_muc_mon").fetchone()[0]
     finally:
@@ -123,10 +129,10 @@ def all_subjects():
         from utils import normalize
         conn = get_db()
         try:
-            rows = conn.execute("SELECT ten_mon, tin_chi, ma_hp, khoa FROM danh_muc_mon").fetchall()
+            rows = conn.execute("SELECT ten_mon, tin_chi, ma_hp, khoa, khoa_cu FROM danh_muc_mon").fetchall()
         finally:
             conn.close()
-        _cache = [dict(ten_mon=r['ten_mon'], tin_chi=r['tin_chi'], ma_hp=r['ma_hp'], khoa=r['khoa'],
+        _cache = [dict(ten_mon=r['ten_mon'], tin_chi=r['tin_chi'], ma_hp=r['ma_hp'], khoa=r['khoa'], khoa_cu=r['khoa_cu'],
                        norm=normalize(r['ten_mon'])) for r in rows]
     return _cache
 
@@ -149,6 +155,8 @@ def stats():
             'codes': conn.execute("SELECT COUNT(DISTINCT ma_hp) FROM hoc_phan WHERE ma_hp IS NOT NULL").fetchone()[0],
             'faculties': [dict(khoa=r[0], nganh=r[1], so_mon=r[2]) for r in conn.execute(
                 "SELECT khoa, COUNT(DISTINCT nganh), COUNT(DISTINCT ten_mon) FROM hoc_phan GROUP BY khoa ORDER BY khoa")],
+            'faculties_old': [dict(khoa=r[0], nganh=r[1], so_mon=r[2]) for r in conn.execute(
+                "SELECT khoa_cu, COUNT(DISTINCT nganh), COUNT(DISTINCT ten_mon) FROM hoc_phan WHERE khoa_cu<>'' GROUP BY khoa_cu ORDER BY khoa_cu")],
         }
     finally:
         conn.close()
@@ -162,7 +170,7 @@ def search_subjects(query, limit=20, khoa=None):
         return []
     subs = all_subjects()
     if khoa:
-        subs = [s for s in subs if s['khoa'] == khoa]
+        subs = [s for s in subs if khoa in (s['khoa'], s['khoa_cu'])]
     out = [s for s in subs if q in s['norm']]
     out.sort(key=lambda s: (not s['norm'].startswith(q), len(s['norm'])))
     if len(out) < limit:
@@ -174,5 +182,6 @@ def search_subjects(query, limit=20, khoa=None):
                     out.append(subs[idx]); seen.add(subs[idx]['ten_mon'])
         except ImportError:
             pass
-    return [{'ten_mon': s['ten_mon'], 'tin_chi': s['tin_chi'], 'ma_hp': s['ma_hp'], 'khoa': s['khoa']}
+    return [{'ten_mon': s['ten_mon'], 'tin_chi': s['tin_chi'], 'ma_hp': s['ma_hp'],
+             'khoa': s['khoa'] + (f" (cũ: {s['khoa_cu']})" if s['khoa_cu'] else '') if s['khoa'] else s['khoa']}
             for s in out[:limit]]

@@ -40,6 +40,44 @@ NGANH = {
 }
 PROG2KHOA = {p: k for k, ps in KHOA.items() for p in ps}
 
+# ---- Khóa 2024 (pre-merge structure, https://daotao.ued.udn.vn/chuong-trinh-dao-tao-ke-hoach-dao-tao-ap-dung-cho-khoa-ts-2024/)
+# file prefix = old faculty number used by UED (311 Toán ... 324 GD Nghệ thuật)
+KHOA_CU = {'311': 'Toán', '312': 'Tin học', '313': 'Vật lý', '314': 'Hóa học', '315': 'Sinh – Môi trường',
+           '316': 'Giáo dục Chính trị', '317': 'Ngữ văn', '318': 'Lịch sử', '319': 'Địa lý', '320': 'Tâm lý – Giáo dục',
+           '322': 'Giáo dục Tiểu học', '323': 'Giáo dục Mầm non', '324': 'Giáo dục Nghệ thuật'}
+KHOA_CU2MOI = {'Toán': 'Toán – Tin', 'Tin học': 'Toán – Tin', 'Vật lý': 'Lý – Hoá', 'Hóa học': 'Lý – Hoá',
+               'Sinh – Môi trường': 'Sinh – Nông nghiệp – Môi trường', 'Giáo dục Chính trị': 'Sử – Địa – Chính trị',
+               'Ngữ văn': 'Ngữ văn – Truyền thông', 'Lịch sử': 'Sử – Địa – Chính trị', 'Địa lý': 'Sử – Địa – Chính trị',
+               'Tâm lý – Giáo dục': 'Tâm lý – Giáo dục – Công tác xã hội', 'Giáo dục Tiểu học': 'Giáo dục Tiểu học – Mầm non',
+               'Giáo dục Mầm non': 'Giáo dục Tiểu học – Mầm non', 'Giáo dục Nghệ thuật': 'Giáo dục Nghệ thuật – Thể chất'}
+NGANH24 = {'311-CKDL': 'Khoa học dữ liệu', '311-ST': 'Sư phạm Toán học', '312-CNTT': 'Công nghệ thông tin', '312-SPT': 'Sư phạm Tin học',
+           '313-CVK': 'Vật lý kỹ thuật', '313-SVL': 'Sư phạm Vật lý', '314-CHD': 'Hóa học (CN Hóa dược)', '314-SHH': 'Sư phạm Hóa học',
+           '314-SKT': 'Sư phạm Khoa học tự nhiên', '315-CNSH': 'Công nghệ sinh học', '315-CTM': 'Quản lý tài nguyên môi trường',
+           '315-SS': 'Sư phạm Sinh học', '316-SGC': 'Giáo dục Chính trị', '316SCD': 'Giáo dục Công dân', '317-CBC': 'Báo chí',
+           '317-CVH': 'Văn học', '317-CVHH': 'Văn hóa học', '317-QHCC': 'Quan hệ công chúng', '317-SNV': 'Sư phạm Ngữ văn',
+           '318-LS': 'Lịch sử', '318-SLD': 'Sư phạm Lịch sử và Địa lý', '318-SLS': 'Sư phạm Lịch sử', '318VNH': 'Việt Nam học',
+           '319-CDDL': 'Địa lý học (Địa lý du lịch)', '319-SDL': 'Sư phạm Địa lý', '320-CTL': 'Tâm lý học', '320-CTXH': 'Công tác xã hội',
+           '322-GDTH': 'Giáo dục Tiểu học', '322-STC': 'Sư phạm Tin học và Công nghệ Tiểu học', '323-GMN': 'Giáo dục Mầm non',
+           '324-SAN': 'Sư phạm Âm nhạc', '324-SGT': 'Giáo dục Thể chất', '324-SMT': 'Sư phạm Mỹ thuật'}
+for _p, _n in NGANH24.items():
+    _old = KHOA_CU[_p[:3]]
+    NGANH[_p] = _n + ' (khóa 2024)'
+    PROG2KHOA[_p] = KHOA_CU2MOI[_old]
+PROG2KHOA_CU = {p: KHOA_CU[p[:3]] for p in NGANH24}
+# 2025 programs -> pre-merge faculty (from the 2024 list)
+for _p, _old in {'Su-pham-Toan-hoc': 'Toán', 'Khoa-hoc-du-lieu': 'Toán', 'Su-pham-Tin-hoc': 'Tin học', 'Cong-nghe-thong-tin': 'Tin học',
+                 'Su-pham-Vat-ly': 'Vật lý', 'Vat-ly-ky-thuat': 'Vật lý', 'Su-pham-Hoa-hoc': 'Hóa học', 'Su-pham-Khoa-hoc-Tu-nhien': 'Hóa học',
+                 'Hoa-duoc': 'Hóa học', 'Su-pham-Sinh-hoc': 'Sinh – Môi trường', 'Quan-ly-Tai-nguyen-Moi-truong': 'Sinh – Môi trường',
+                 'Cong-nghe-sinh-hoc': 'Sinh – Môi trường', 'Giao-duc-chinh-tri': 'Giáo dục Chính trị', 'Giao-duc-Cong-dan': 'Giáo dục Chính trị',
+                 'Su-pham-Ngu-van': 'Ngữ văn', 'Bao-chi': 'Ngữ văn', 'Van-hoc': 'Ngữ văn', 'Van-hoa-hoc': 'Ngữ văn', 'Quan-he-cong-chung': 'Ngữ văn',
+                 'Su-pham-Lich-su-1': 'Lịch sử', 'Su-pham-Lich-su-Dia-ly': 'Lịch sử', 'Viet-Nam-hoc': 'Lịch sử', 'Quan-he-quoc-te': 'Lịch sử',
+                 'Su-pham-Dia-ly': 'Địa lý', 'Dia-ly-hoc': 'Địa lý', 'Tam-ly-hoc': 'Tâm lý – Giáo dục', 'Cong-tac-xa-hoi': 'Tâm lý – Giáo dục',
+                 'Giao-duc-Tieu-hoc': 'Giáo dục Tiểu học', 'Su-pham-Tin-va-Cong-nghe-tieu-hoc': 'Giáo dục Tiểu học',
+                 'Giao-duc-Mam-non': 'Giáo dục Mầm non', 'Su-pham-Am-nhac': 'Giáo dục Nghệ thuật', 'Su-pham-My-thuat': 'Giáo dục Nghệ thuật',
+                 'Giao-duc-The-chat': 'Giáo dục Nghệ thuật'}.items():
+    PROG2KHOA_CU[_p] = _old
+# 'Hoa-phan-tich-Ung-dung' and 'Giao-duc-Phap-luat' are new in 2025 (no pre-merge faculty) -> left blank
+
 
 def strip(s):
     s = unicodedata.normalize('NFD', s)
@@ -52,9 +90,16 @@ def parse_page(words, credit_x=None):
         w['xc'] = (b[0] + b[2]) / 2; w['yc'] = (b[1] + b[3]) / 2
     W = max(w['x2'] for w in words) if words else 1
     # header: "Số tín chỉ" column
+    hdr = None
     for w in words:
         if re.search(r'tin chi', strip(w['t'])) and w['xc'] > 0.4 * W:
-            credit_x = w['xc']
+            hdr = w['xc']
+    # 2024 layout: "Số tín chỉ" spans TC | LT | TH ... -> use the "TC" sub-header when present
+    tc = [w for w in words if w['t'].strip().upper() in ('TC', 'STC') and w['xc'] > 0.4 * W]
+    if tc:
+        credit_x = min(tc, key=lambda w: w['xc'])['xc']
+    elif hdr is not None:
+        credit_x = hdr
     codes = [w for w in words if re.fullmatch(r'\*?\d{8}\*?', w['t'].strip()) and w['xc'] < 0.35 * W]
     codes.sort(key=lambda w: w['yc'])
     if not codes or credit_x is None:
@@ -82,7 +127,7 @@ def clean_name(n):
     n = re.sub(r'\s+', ' ', n).strip(' .,*-')
     n = re.sub(r'\s*\*$', '', n)
     n = re.sub(r'(?i)\b(học phần|hoc phan) (tự chọ\w*|bắt buộc)( tối thiểu)?\b', ' ', n)
-    n = re.sub(r'(?i)số tín chỉ( trong kỳ)?', ' ', n)
+    n = re.sub(r'(?i)số tín ch\w*( trong k\w*)?', ' ', n)
     n = re.sub(r'\s(19[89]\d)$', '', n)
     n = n.replace('C/C%4', 'C/C++').replace('C/C%', 'C/C++').replace('C%', 'C++')
     n = re.sub(r'(?i)\bkhối kiến thức[^A-Z]*$', ' ', n)
@@ -92,8 +137,11 @@ def clean_name(n):
 
 
 def main(ocr_json, out_csv, urls_file):
-    data = json.load(open(ocr_json))
-    urls = {os.path.basename(u.strip())[:-4]: u.strip() for u in open(urls_file) if u.strip()}
+    data, urls = {}, {}
+    for oj, uf in zip(ocr_json.split(','), urls_file.split(',')):
+        if os.path.exists(oj):
+            data.update(json.load(open(oj)))
+            urls.update({os.path.basename(u.strip())[:-4]: u.strip() for u in open(uf) if u.strip()})
     by_prog = defaultdict(list)
     for k in sorted(data, key=lambda k: (k.rsplit('-', 1)[0], int(k.rsplit('-', 1)[1][:-4]))):
         by_prog[k.rsplit('-', 1)[0]].append(k)
@@ -119,17 +167,23 @@ def main(ocr_json, out_csv, urls_file):
         if not names[code]:
             continue
         key = (code, r['prog'])
-        best_name = max(names[code], key=lambda n: (names[code][n] * 10 + min(len(n.split()), 12)
-                                                    - (6 if len(n.split()) <= 1 and names[code][n] < 2 else 0)))
+        cands = names[code]
+        def _score(n):
+            sc = cands[n] * 10 + min(len(n.split()), 12) - (6 if len(n.split()) <= 1 and cands[n] < 2 else 0)
+            base = re.sub(r'\s\d$', '', n)
+            if base != n and base in cands:
+                sc -= 25  # trailing semester digit leaked from the 2024 plan columns
+            return sc
+        best_name = max(cands, key=_score)
         if key in seen:
             continue
         seen.add(key)
         tc = credits[code].most_common(1)[0][0] if credits[code] else ''
         out.append({'ma_hp': code, 'ten_mon': best_name, 'tin_chi': tc,
-                    'khoa': PROG2KHOA.get(r['prog'], ''), 'nganh': NGANH.get(r['prog'], r['prog']),
+                    'khoa': PROG2KHOA.get(r['prog'], ''), 'khoa_cu': PROG2KHOA_CU.get(r['prog'], ''), 'nganh': NGANH.get(r['prog'], r['prog']),
                     'nguon': urls.get(r['prog'], '') + ('' if tc != '' else ' [tín chỉ: không đọc được]')})
     with open(out_csv, 'w', encoding='utf-8', newline='') as f:
-        w = csv.DictWriter(f, fieldnames=['ma_hp', 'ten_mon', 'tin_chi', 'khoa', 'nganh', 'nguon'])
+        w = csv.DictWriter(f, fieldnames=['ma_hp', 'ten_mon', 'tin_chi', 'khoa', 'khoa_cu', 'nganh', 'nguon'])
         w.writeheader(); w.writerows(out)
     print(f"raw rows={len(raw)} out rows={len(out)} codes={len({o['ma_hp'] for o in out})} "
           f"names={len({o['ten_mon'] for o in out})} programs={len({o['nganh'] for o in out})} "
@@ -137,4 +191,4 @@ def main(ocr_json, out_csv, urls_file):
 
 
 if __name__ == '__main__':
-    main(*(sys.argv[1:] or ['/tmp/ctdt/ocr2.json', 'data/hoc_phan_ued.csv', '/tmp/ctdt/urls.txt']))
+    main(*(sys.argv[1:] or ['/tmp/ctdt/ocr2.json,/tmp/ctdt24/ocr2.json', 'data/hoc_phan_ued.csv', '/tmp/ctdt/urls.txt,/tmp/ctdt24/u.txt']))

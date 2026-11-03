@@ -287,6 +287,11 @@ def _get_hybrid():
     if _vietocr_model is None:
         from vietocr.tool.config import Cfg
         from vietocr.tool.predictor import Predictor
+        import functools
+        import vietocr.tool.predictor as _vp
+        from vietocr.tool.translate import translate as _tr
+        # cap decoding length: a crop without EOS otherwise decodes 128 steps and can stall for minutes on CPU
+        _vp.translate = functools.partial(_tr, max_seq_length=int(os.environ.get('VIETOCR_MAX_LEN', '64')))
         cfg_file = os.environ.get('VIETOCR_CONFIG_FILE', '')
         if cfg_file and os.path.exists(cfg_file):
             cfg = Cfg.load_config_from_file(cfg_file)  # offline (saved at build time)

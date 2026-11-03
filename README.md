@@ -1,3 +1,13 @@
+---
+title: UED Calculate Grade
+emoji: 🎓
+colorFrom: blue
+colorTo: yellow
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # 🌸 UED Calculate Grade!
 
 > **Hệ thống quản lý điểm số thông minh dành cho sinh viên Đại học Đà Nẵng**  
@@ -587,3 +597,18 @@ gunicorn --bind 0.0.0.0:5000 --workers 1 --threads 4 --timeout 300 app:app
 
 ### Kiểm thử
 `python tests/make_synthetic.py && python tests/eval_ocr.py` — ảnh viết tay giả lập (font Patrick Hand, xoay + nhiễu).
+
+
+## 🌐 Deploy online (1 server: giao diện + API Python + OCR)
+
+### Google Cloud Run (khuyên dùng — đăng nhập bằng tài khoản Google)
+Mở https://console.cloud.google.com → bật Billing (cần thẻ; trong free tier 180.000 vCPU-giây/tháng thì $0) → mở **Cloud Shell** và chạy:
+```bash
+git clone -b feature/vietocr-all-faculties-ued-ui https://github.com/endenko/CaculateGradeUED && cd CaculateGradeUED
+gcloud run deploy ued-grade --source . --region asia-southeast1 --allow-unauthenticated \
+  --memory 4Gi --cpu 2 --timeout 300 --concurrency 2 --max-instances 2
+```
+Cloud Run trả về URL công khai `https://ued-grade-xxxx.a.run.app`. Đặt `--max-instances` thấp để không vượt free tier.
+
+### Hugging Face Spaces (Docker)
+Tạo Space SDK *Docker*, push repo này (YAML đầu README đã khai báo `sdk: docker`, `app_port: 7860`). Lưu ý: từ 2026 Docker Space trên CPU Basic yêu cầu gói PRO.
