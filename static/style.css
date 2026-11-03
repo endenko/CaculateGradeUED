@@ -136,6 +136,14 @@ body{font-family:'Be Vietnam Pro',system-ui,sans-serif;background:linear-gradien
 .sem-target{border-top:1px solid #e4ebf5;padding-top:.8rem}
 .sem-options{min-height:8.5rem;margin-top:.6rem}
 .sem-option{padding:.55rem .2rem;border-bottom:1px solid #eef2f7}
+.cpa-outlook{min-height:11rem}
+.cpa-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.5rem;margin-bottom:.6rem}
+.cpa-stats div{background:#f8fbff;border-radius:10px;padding:.45rem .55rem}
+.cpa-stats b{display:block;font-size:1.15rem;color:var(--ued-blue-dark);line-height:1.2}
+.cpa-stats span{font-size:.72rem;color:#5c6b80}
+.cpa-gap{color:#c0392b}
+.cpa-ok{color:#0b7a3e}
+@media (max-width:576px){.cpa-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .sem-option .tag{font-weight:800;color:var(--ued-blue)}
 .btn-sua{border:1px solid var(--ued-blue);color:var(--ued-blue);background:#fff;border-radius:8px;font-weight:700;font-size:.78rem;padding:.2rem .55rem}
 .ued-footer{color:#6b7a90}.ued-footer a{color:var(--ued-blue);font-weight:600}

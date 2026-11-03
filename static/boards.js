@@ -116,8 +116,10 @@
         const prev = sel.value;
         const keys = collectKeys();
         sel.innerHTML = keys.map(k => `<option value="${esc(k)}">${esc(semLabel(k))}</option>`).join('');
+        const populated = keys.find(k => k !== 'unknown' && (
+            t2.some(c => semKey(c) === k) || (window.transcriptData || []).some(c => tongKey(c) === k)));
         if (keys.includes(prev)) sel.value = prev;
-        else sel.value = keys.find(k => k !== 'unknown') || keys[0];
+        else sel.value = populated || keys.find(k => k !== 'unknown') || keys[0];
     }
     function syncAssignFromKey(key) {
         if (!key || key === 'unknown' || !$('assignYear')) return;
@@ -292,70 +294,166 @@
         rows.forEach(r => { cr += r.credits; q += r.points * r.credits; });
         return cr ? round2(q / cr) : null;
     }
-    function renderOverall() {
-        const out = $('solveOut');
-        if (!out) return;
-        const target = parseFloat(($('solveTarget') || {}).value || '3.2');
-        const w = weights();
+    const VI = (n) => (n == null || Number.isNaN(n) ? '—' : Number(n).toFixed(2).replace('.', ','));
+    function outlookBundle() {
         const fixed = [];
         const variable = [];
         (window.transcriptData || []).forEach(c => {
             const letter = c.sim_grade || c.diem_he_4;
             if (POINTS[letter] == null) return;
-            fixed.push({ id: 't1-' + c.ten_mon, ten_mon: c.ten_mon, credits: c.tin_chi, points: POINTS[letter], letter });
+            fixed.push({ ten_mon: c.ten_mon, credits: c.tin_chi, points: POINTS[letter], letter, lan: c.lan || 1 });
         });
         visible().forEach(c => {
-            const already = fixed.some(r => r.ten_mon === c.ten_mon);
-            if (c.bp != null && c.gk != null && c.ck == null) variable.push(c);
-            else if (c.points != null && !already && !c.fromTong) {
-                fixed.push({ id: c.id, ten_mon: c.ten_mon, credits: c.tin_chi, points: c.points, letter: c.letter });
+            if (c.fromTong || fixed.some(r => r.ten_mon === c.ten_mon)) {
+                if (c.bp != null && c.gk != null && c.ck == null) variable.push(c);
+                return;
             }
+            const open = c.in_progress || c.points == null || (c.bp != null && c.gk != null && c.ck == null);
+            if (open) variable.push(c);
+            else if (c.points != null) fixed.push({ ten_mon: c.ten_mon, credits: c.tin_chi, points: c.points, letter: c.letter, lan: c.lan || 1 });
         });
-        let assignment = null;
-        const order = [['D', 4, 1], ['D+', 5, 1.5], ['C', 5.5, 2], ['C+', 6.5, 2.5], ['B', 7, 3], ['B+', 8, 3.5], ['A', 8.5, 4]];
-        function bestUnder(course, cap) {
-            let chosen = null;
-            for (const [letter, minimum, points] of order) {
+        return { fixed, variable };
+    }
+    function gpaOf(rows) {
+        return cpa(rows.map(r => ({ credits: r.credits, points: r.points })));
+    }
+    function creditsUntil(quality, credits, target, grade) {
+        if (!(credits > 0) || grade <= target) return null;
+        for (let n = 0; n <= 400; n++) {
+            if (round2((quality + n * grade) / (credits + n)) + 1e-9 >= target) return n;
+        }
+        return null;
+    }
+    function creditsAfford(quality, credits, target, grade) {
+        if (grade + 1e-9 >= target) return null;
+        let n = 0;
+        for (let k = 1; k <= 400; k++) {
+            if (round2((quality + k * grade) / (credits + k)) + 1e-9 < target) break;
+            n = k;
+        }
+        return n;
+    }
+    function renderOverall() {
+        const out = $('solveOut');
+        if (!out) return;
+        const target = parseFloat(($('solveTarget') || {}).value || '3.2');
+        const w = weights();
+        const { fixed, variable } = outlookBundle();
+        const rows = fixed.map(r => ({ credits: r.credits, points: r.points }));
+        let quality = 0, credits = 0;
+        rows.forEach(r => { quality += r.points * r.credits; credits += r.credits; });
+        const now = credits ? round2(quality / credits) : null;
+        const reached = now != null && now + 1e-9 >= target;
+        const gap = now == null ? null : round2(target - now);
+        const pct = now == null ? 0 : Math.max(0, Math.min(100, (now / target) * 100));
+        const gapHtml = now == null ? '<b>—</b>' : (reached
+            ? `<b class="cpa-ok">Vượt ${VI(now - target)}</b>`
+            : `<b class="cpa-gap">Thiếu ${VI(gap)}</b>`);
+        let body = '';
+        if (!credits && !variable.length) {
+            body = '<p class="mb-0 text-muted">Chưa có điểm để tính CPA.</p>';
+        } else if (!variable.length) {
+            if (reached) {
+                const b = creditsAfford(quality, credits, target, 3);
+                const c = creditsAfford(quality, credits, target, 2);
+                const room = (label, n) => n == null
+                    ? `Điểm ${label} không thấp hơn mốc, thêm bao nhiêu cũng không kéo CPA xuống dưới.`
+                    : (n === 0 ? `Thêm 1 tín chỉ điểm ${label} là CPA xuống dưới mốc.` : `Còn thêm được khoảng ${n} tín chỉ điểm ${label}.`);
+                body = `<p class="mb-1">Đã đạt mốc, cao hơn ${VI(now - target)}.</p>
+                    <p class="mb-0 text-muted">Nếu học tiếp: ${room('B (3,0)', b)} ${room('C (2,0)', c)}</p>`;
+            } else {
+                const a = creditsUntil(quality, credits, target, 4);
+                const bp = creditsUntil(quality, credits, target, 3.5);
+                const aText = a == null ? 'Điểm A cũng không kéo tới mốc.' : `Cần thêm khoảng <b>${a} tín chỉ điểm A (4,0)</b>.`;
+                const bText = bp == null ? 'Điểm B+ (3,5) thấp hơn mốc nên không kéo CPA lên mốc này.' : `Nếu toàn B+ thì cần khoảng <b>${bp} tín chỉ</b>.`;
+                body = `<p class="mb-1">Chưa có môn đang học trong kỳ đang xem.</p><p class="mb-0">${aText} ${bText}</p>`;
+            }
+        } else {
+            const plans = outlookPlans(fixed, variable, target, w);
+            const best = bestReachable(fixed, variable, w);
+            if (plans.length) {
+                body = `<p class="mb-1">Môn đang học cần những mức sau để CPA tới mốc. Dễ trước.</p>` + plans.slice(0, 5).map((opt, i) => {
+                    const lines = opt.courses.map(c => c.components && c.min_ck != null
+                        ? `${esc(c.ten_mon)} <b>${esc(c.letter)}</b> (CK ${Number(c.min_ck).toFixed(1)})`
+                        : `${esc(c.ten_mon)} <b>${esc(c.letter)}</b>`).join(', ');
+                    return `<div class="sem-option"><span class="tag">${i + 1}. CPA ${VI(opt.gpa)}</span> · ${esc(opt.label)}<div>${lines}</div></div>`;
+                }).join('');
+            } else {
+                body = `<p class="mb-0">Kể cả môn đang học được mức cao nhất có thể, CPA chỉ tới <b>${VI(best)}</b>, vẫn thiếu ${VI(target - best)}. Không có cách nào trong các môn này.</p>`;
+            }
+        }
+        const second = [...fixed, ...variable].reduce((s, c) => s + ((c.lan || 1) >= 2 ? Number(c.credits || c.tin_chi) || 0 : 0), 0);
+        const program = parseFloat(($('targetCredits') || {}).value) || 130;
+        const retake = second > program * 0.05
+            ? `<p class="mb-0 mt-2 text-muted">Tín chỉ học từ lần 2 là ${second}, vượt 5% của ${program} tín chỉ chương trình. QĐ 1586 Điều 13 và QĐ 1473 Điều 25 hạ một bậc hạng xuất sắc hoặc giỏi.</p>`
+            : '';
+        out.innerHTML = `<div class="cpa-stats">
+            <div><span>CPA hiện tại</span><b>${VI(now)}</b></div>
+            <div><span>Tín chỉ tính</span><b>${credits || 0}</b></div>
+            <div><span>Mốc</span><b>${VI(target)}</b></div>
+            <div><span>Khoảng cách</span>${gapHtml}</div>
+        </div>
+        <div class="progress mb-2" aria-hidden="true"><div class="progress-bar" style="width:${pct.toFixed(0)}%">${reached ? 'Đạt' : pct.toFixed(0) + '%'}</div></div>
+        ${body}${retake}`;
+    }
+    function outlookPlans(fixed, variable, target, w) {
+        const letters = [['D', 4, 1], ['D+', 5, 1.5], ['C', 5.5, 2], ['C+', 6.5, 2.5], ['B', 7, 3], ['B+', 8, 3.5], ['A', 8.5, 4]];
+        const prepared = variable.map(course => {
+            const known = course.bp != null && course.gk != null && course.ck == null;
+            const opts = [];
+            letters.forEach(([letter, minimum, points]) => {
+                if (!known) { opts.push({ letter, points, ck: null, known: false }); return; }
                 const ck = minCk(course.bp, course.gk, minimum, w);
-                if (ck == null || ck > cap + 1e-9) continue;
-                chosen = { letter, points, ck, minimum };
-            }
-            return chosen;
+                if (ck == null || ck > 10) return;
+                opts.push({ letter, points, ck, known: true });
+            });
+            return opts.length ? opts : [{ letter: 'A', points: 4, ck: null, known: false }];
+        });
+        const found = [];
+        const base = fixed.map(r => ({ credits: r.credits, points: r.points }));
+        function consider(choice) {
+            const rows = base.slice();
+            let maxCk = 0, sumCk = 0, saw = false;
+            const courses = choice.map((opt, i) => {
+                rows.push({ credits: variable[i].tin_chi, points: opt.points });
+                if (opt.known && opt.ck != null) { saw = true; maxCk = Math.max(maxCk, opt.ck); sumCk += opt.ck; }
+                return { ten_mon: variable[i].ten_mon, letter: opt.letter, points: opt.points, min_ck: opt.known ? opt.ck : null, components: opt.known, credits: variable[i].tin_chi };
+            });
+            const gpa = gpaOf(rows.map(r => ({ credits: r.credits, points: r.points, tin_chi: r.credits })));
+            if (gpa == null || gpa + 1e-9 < target) return;
+            found.push({ gpa, maxCk: saw ? maxCk : 99, sumCk, courses, label: maxCk >= 8.5 && saw ? 'Khó (cần CK ≥ 8,5)' : 'Khả thi' });
         }
-        function gpaOf(asg) {
-            const rows = fixed.map(r => ({ credits: r.credits, points: r.points }));
-            variable.forEach(c => rows.push({ credits: c.tin_chi, points: asg[c.id].points }));
-            return cpa(rows);
+        function walk(i, acc) {
+            if (found.length > 2500) return;
+            if (i === prepared.length) { consider(acc); return; }
+            prepared[i].forEach(opt => { acc.push(opt); walk(i + 1, acc); acc.pop(); });
         }
-        if (!variable.length) {
-            const now = cpa(fixed.map(r => ({ credits: r.credits, points: r.points })));
-            const ok = now != null && now + 1e-9 >= target;
-            out.innerHTML = `<b class="${ok ? 'text-success' : 'text-danger'}">${ok ? 'Đã đạt mốc' : 'Chưa đạt mốc'}</b> — CPA hiện ${now == null ? '—' : now.toFixed(2)}.`;
-            return;
-        }
-        for (let cap = 0; cap <= 10.001; cap = Math.round((cap + 0.1) * 10) / 10) {
-            const trial = {};
-            let ok = true;
-            for (const course of variable) {
-                const plan = bestUnder(course, cap);
-                if (!plan) { ok = false; break; }
-                trial[course.id] = plan;
-            }
-            if (ok && gpaOf(trial) + 1e-9 >= target) { assignment = trial; break; }
-        }
-        const impossible = !assignment;
-        if (impossible) {
-            assignment = {};
-            variable.forEach(c => { assignment[c.id] = { letter: 'A', points: 4, ck: minCk(c.bp, c.gk, 8.5, w), minimum: 8.5 }; });
-        }
-        const lines = variable.map(c => {
-            const p = assignment[c.id];
-            const ck = p.ck == null || p.ck > 10 ? 'CK &gt; 10' : p.ck.toFixed(1);
-            return `<li><b>${esc(c.ten_mon)}</b>: ${p.letter}, CK tối thiểu ${ck}</li>`;
-        }).join('');
-        const achieved = gpaOf(assignment);
-        out.innerHTML = `<div class="fw-bold">${impossible ? 'Bất khả thi trong kỳ này' : 'Có phương án'}</div>
-            <div>CPA sau phân bổ: <b>${achieved == null ? '—' : achieved.toFixed(2)}</b> (mốc ${target})</div><ul>${lines}</ul>`;
+        if (variable.length && variable.length <= 4) walk(0, []);
+        found.sort((a, b) => a.maxCk - b.maxCk || a.sumCk - b.sumCk || a.courses.reduce((s, c) => s + c.points * c.credits, 0) - b.courses.reduce((s, c) => s + c.points * c.credits, 0));
+        const seen = new Set();
+        const out = [];
+        found.forEach(p => {
+            const key = p.courses.map(c => c.ten_mon + c.letter).join('|');
+            if (seen.has(key)) return;
+            seen.add(key);
+            out.push(p);
+        });
+        return out.slice(0, 5);
+    }
+    function bestReachable(fixed, variable, w) {
+        const letters = [['D', 4, 1], ['D+', 5, 1.5], ['C', 5.5, 2], ['C+', 6.5, 2.5], ['B', 7, 3], ['B+', 8, 3.5], ['A', 8.5, 4]];
+        const rows = fixed.map(r => ({ credits: r.credits, points: r.points }));
+        variable.forEach(course => {
+            const known = course.bp != null && course.gk != null && course.ck == null;
+            let best = 0;
+            letters.forEach(([letter, minimum, points]) => {
+                if (!known) { best = Math.max(best, points); return; }
+                const ck = minCk(course.bp, course.gk, minimum, w);
+                if (ck != null && ck <= 10) best = Math.max(best, points);
+            });
+            rows.push({ credits: course.tin_chi, points: best || 4 });
+        });
+        return gpaOf(rows.map(r => ({ credits: r.credits, points: r.points, tin_chi: r.credits })));
     }
 
     function bind() {
@@ -363,13 +461,13 @@
         if (storedW) { $('wBp').value = storedW[0]; $('wGk').value = storedW[1]; $('wCk').value = storedW[2]; }
         $('semSelect').addEventListener('change', () => {
             syncAssignFromKey($('semSelect').value);
-            renderBody(); renderOptions(); if (editing()) renderEditor();
+            renderBody(); renderOptions(); renderOverall(); if (editing()) renderEditor();
         });
         const viewPickedTerm = () => {
             const key = $('assignYear').value + '|' + $('assignTerm').value;
             fillSemSelect();
             $('semSelect').value = key;
-            renderBody(); renderOptions();
+            renderBody(); renderOptions(); renderOverall();
         };
         $('assignYear').addEventListener('change', viewPickedTerm);
         $('assignTerm').addEventListener('change', viewPickedTerm);
@@ -416,8 +514,8 @@
             if (!row.from_ocr) { row.letter = null; row.points = null; row.score10 = null; row.in_progress = true; }
             save(); renderEditor(); renderBody(); renderOptions();
         });
-        const solve = $('btnSolve');
-        if (solve) solve.addEventListener('click', renderOverall);
+        const solveTarget = $('solveTarget');
+        if (solveTarget) solveTarget.addEventListener('change', () => renderOverall());
     }
 
     function suggest() {
@@ -489,7 +587,7 @@
         const key = known ? term.nam_hoc + '|' + term.hoc_ky : 'unknown';
         if ([...$('semSelect').options].some(o => o.value === key)) $('semSelect').value = key;
         syncAssignFromKey(key);
-        renderBody(); renderOptions();
+        renderBody(); renderOptions(); renderOverall();
         const panel = (String(target) === '1' && !rows.some(m => m.in_progress)) ? 'bangdiem' : 'diemhp';
         const tab = document.querySelector(`.site-menu [data-panel="${panel}"]`);
         if (tab) tab.click();
@@ -500,5 +598,6 @@
         fillSemSelect();
         renderBody();
         renderOptions();
+        renderOverall();
     }
 })();

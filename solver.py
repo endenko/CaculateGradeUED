@@ -412,6 +412,197 @@ def semester_options(table2, target, weights=(0.2, 0.3, 0.5), limit=5) -> list:
     return [plan]
 
 
+def _credits_until(quality, credits, target, grade_points):
+    """Smallest whole number of new credits at `grade_points` that reaches `target`."""
+    if credits <= 0 or grade_points <= target:
+        return None
+    for n in range(0, 401):
+        gpa = float(round2((Decimal(str(quality)) + Decimal(n) * Decimal(str(grade_points))) / (Decimal(str(credits)) + Decimal(n))))
+        if gpa + 1e-9 >= target:
+            return n
+    return None
+
+
+def _credits_afford(quality, credits, target, grade_points):
+    """How many credits at a lower grade can be added before CPA falls under `target`.
+
+    None means that grade is not below the target, so adding it does not pull CPA under the mark.
+    """
+    if grade_points + 1e-9 >= target:
+        return None
+    if credits <= 0:
+        return 0
+    affordable = 0
+    for n in range(1, 401):
+        gpa = float(round2((Decimal(str(quality)) + Decimal(n) * Decimal(str(grade_points))) / (Decimal(str(credits)) + Decimal(n))))
+        if gpa + 1e-9 < target:
+            break
+        affordable = n
+    return affordable
+
+
+def retake_downgrade_note(courses, program_credits=130):
+    """QĐ 1586 Điều 13 / QĐ 1473 Điều 25: hạ hạng xuất sắc, giỏi khi lần học từ lần 2 vượt 5% chương trình."""
+    second = sum(float(c.get("credits") or 0) for c in courses if int(c.get("lan") or 1) >= 2)
+    program = float(program_credits or 0)
+    if program <= 0 or second <= program * 0.05:
+        return None
+    return (
+        f"Tín chỉ học từ lần 2 trở đi là {second:g}, vượt 5% của {program:g} tín chỉ chương trình. "
+        "QĐ 1586 Điều 13 và QĐ 1473 Điều 25 hạ một bậc hạng xuất sắc hoặc giỏi."
+    )
+
+
+def cpa_outlook(fixed, variable, target, weights=(0.2, 0.3, 0.5), limit=5, program_credits=130) -> dict:
+    """CPA hiện tại, khoảng cách tới mốc, và cách chạm mốc.
+
+    `fixed` đã có điểm. `variable` là môn đang học: có bp+gk thì tính CK, không có thì chỉ xếp chữ.
+    """
+    target = float(target)
+    weights = tuple(float(w) for w in weights)
+    limit = max(1, min(int(limit), 5))
+    rows = [{"credits": r["credits"], "points": r["points"]} for r in fixed]
+    stats = cpa(rows)
+    cpa_now = stats["cpa"]
+    credits = stats["credits"]
+    quality = stats["quality"]
+    gap = None if cpa_now is None else round(float(target) - float(cpa_now), 2)
+    reached = cpa_now is not None and cpa_now + 1e-9 >= target
+    note = retake_downgrade_note(list(fixed) + list(variable), program_credits)
+
+    def pack(**extra):
+        base = {
+            "cpa": cpa_now,
+            "credits": credits,
+            "quality": quality,
+            "target": target,
+            "gap": 0.0 if reached else gap,
+            "reached": reached,
+            "margin": round(float(cpa_now) - float(target), 2) if reached and cpa_now is not None else None,
+            "has_in_progress": bool(variable),
+            "plans": [],
+            "best_reachable": None,
+            "all_a_reaches": None,
+            "future_a_credits": None,
+            "future_bplus_credits": None,
+            "afford_b": None,
+            "afford_c": None,
+            "retake_note": note,
+        }
+        base.update(extra)
+        return base
+
+    if cpa_now is None and not variable:
+        return pack()
+
+    if not variable:
+        return pack(
+            future_a_credits=0 if reached else _credits_until(quality, credits, target, 4.0),
+            future_bplus_credits=0 if reached else _credits_until(quality, credits, target, 3.5),
+            afford_b=_credits_afford(quality, credits, target, 3.0) if reached else None,
+            afford_c=_credits_afford(quality, credits, target, 2.0) if reached else None,
+        )
+
+    prepared = []
+    for course in variable:
+        known = course.get("bp") is not None and course.get("gk") is not None and course.get("ck") is None
+        opts = []
+        for letter, minimum, points in PLAN_LETTERS:
+            if known:
+                ck = _ck_for(course, minimum, weights)
+                if ck is None or ck > 10:
+                    continue
+                opts.append((letter, float(points), float(ck), True))
+            else:
+                opts.append((letter, float(points), None, False))
+        prepared.append(opts or [("A", 4.0, None, False)])
+
+    found = []
+
+    def consider(choice):
+        plan_rows = list(rows)
+        courses_out = []
+        max_ck = 0.0
+        sum_ck = 0.0
+        saw_ck = False
+        for course, (letter, points, ck, known) in zip(variable, choice):
+            plan_rows.append({"credits": course["credits"], "points": points})
+            if known and ck is not None:
+                saw_ck = True
+                max_ck = max(max_ck, ck)
+                sum_ck += ck
+            courses_out.append({
+                "id": course.get("id"),
+                "ten_mon": course.get("ten_mon"),
+                "credits": course["credits"],
+                "letter": letter,
+                "points": points,
+                "min_ck": ck if known else None,
+                "ck_over": False,
+                "components": known,
+            })
+        gpa = cpa(plan_rows)["cpa"]
+        if gpa is None or gpa + 1e-9 < target:
+            return
+        found.append({
+            "gpa": gpa,
+            "max_ck": max_ck if saw_ck else None,
+            "sum_ck": round(sum_ck, 1) if saw_ck else None,
+            "feasible": True,
+            "courses": courses_out,
+            "summary": ", ".join(f"{c['ten_mon']} {c['letter']}" for c in courses_out),
+            "label": _label(max_ck if saw_ck else 0, False),
+        })
+
+    def walk(i, acc):
+        if len(found) > 2500:
+            return
+        if i == len(prepared):
+            consider(acc)
+            return
+        for opt in prepared[i]:
+            acc.append(opt)
+            walk(i + 1, acc)
+            acc.pop()
+
+    if len(variable) <= 4:
+        walk(0, [])
+    else:
+        # One step around the easiest feasible letter of each course.
+        seeds = []
+        for opts in prepared:
+            seeds.append(opts[0])
+        consider(seeds)
+
+    ranked = sorted(found, key=lambda p: (
+        p["max_ck"] if p["max_ck"] is not None else 99,
+        p["sum_ck"] or 0,
+        sum(c["points"] * c["credits"] for c in p["courses"]),
+        p["gpa"],
+    ))
+    plans = []
+    seen = set()
+    for plan in ranked:
+        key = tuple((c["ten_mon"], c["letter"]) for c in plan["courses"])
+        if key in seen:
+            continue
+        seen.add(key)
+        plans.append(plan)
+        if len(plans) >= limit:
+            break
+
+    best_choice = []
+    for course, opts in zip(variable, prepared):
+        known_opts = [o for o in opts if o[3]]
+        pool = known_opts or opts
+        best_choice.append(max(pool, key=lambda o: o[1]))
+    best_rows = list(rows)
+    for course, (_letter, points, _ck, _known) in zip(variable, best_choice):
+        best_rows.append({"credits": course["credits"], "points": points})
+    best = cpa(best_rows)["cpa"]
+    return pack(plans=plans, best_reachable=best, all_a_reaches=best is not None and best + 1e-9 >= target)
+
+
 def solve(table1, table2, target, scope="overall", weights=(0.2, 0.3, 0.5)) -> dict:
     """scope 'overall': CPA bảng 1 (kể cả giả lập) + bảng 2. 'semester': chỉ bảng 2.
 

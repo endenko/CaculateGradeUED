@@ -266,19 +266,18 @@
 
 <section id="panel-muctieu" class="tool-panel" hidden>
     <div class="card p-3 p-md-4">
-        <h5 class="section-title">Mục tiêu CPA (Điểm tổng + học kỳ đang xem)</h5>
-        <p class="small text-muted">GPA tích lũy gồm các môn Điểm tổng và các môn đang chờ cuối kỳ ở học kỳ đang chọn. Môn đã có điểm ở cả hai nơi chỉ tính một lần.</p>
-        <div class="row g-2 align-items-end">
-            <div class="col-md-6"><label class="form-label small">Mốc</label>
-                <select id="solveTarget" class="form-select form-select-sm">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
+            <h5 class="section-title mb-0">Mục tiêu CPA</h5>
+            <label class="small mb-0 d-flex align-items-center gap-2">Mốc
+                <select id="solveTarget" class="form-select form-select-sm" style="width:auto">
                     <option value="3.6">Xuất sắc 3,6</option>
                     <option value="3.2" selected>Giỏi 3,2</option>
                     <option value="2.5">Khá 2,5</option>
                 </select>
-            </div>
-            <div class="col-md-6"><button type="button" class="btn btn-ued btn-sm w-100" id="btnSolve">Tính CPA cần đạt</button></div>
+            </label>
         </div>
-        <div id="solveOut" class="small mt-3"></div>
+        <p class="small text-muted mb-2">Tính từ Điểm tổng và các môn đang học ở học kỳ đang xem. Môn đã có điểm ở cả hai nơi chỉ tính một lần.</p>
+        <div id="solveOut" class="cpa-outlook"></div>
     </div>
 </section>
 
