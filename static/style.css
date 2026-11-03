@@ -83,7 +83,25 @@ body{font-family:'Be Vietnam Pro',system-ui,sans-serif;background:linear-gradien
 .ocr-row-low{background:#fff4e5}
 .row-low{background:#fde8e6}
 .row-low td{box-shadow:inset 3px 0 0 #c0392b}
-.board-tabs{display:flex;gap:.4rem;margin-bottom:.6rem}
-@media (min-width:992px){.board-tabs{display:none}}
+.swipe-pills,.swipe-dots{display:none}
+.swipe-row{display:flex;align-items:flex-start}
+.swipe-item{min-width:0}
+.swipe-dot{width:7px;height:7px;border:0;border-radius:50%;background:#c5d4ea;padding:0}
+.swipe-dot.active{background:var(--ued-blue)}
+.table-scroll{max-height:320px;overflow:auto;-webkit-overflow-scrolling:touch}
+.table-scroll table{margin-bottom:0}
+.table-scroll.table-wide table{min-width:36rem}
+.table-scroll thead th{position:sticky;top:0;z-index:2;background:var(--ued-blue)}
+@media (min-width:992px){
+  .swipe-row{gap:1rem}
+  .swipe-item.swipe-list{flex:0 0 42%}
+  .swipe-item.swipe-scores{flex:1 1 auto}
+}
+@media (max-width:991.98px){
+  .swipe-pills{display:flex;gap:.4rem;margin-bottom:.55rem}
+  .swipe-dots{display:flex;justify-content:center;gap:.45rem;margin:0 0 .55rem}
+  .swipe-row{gap:0;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;width:100%}
+  .swipe-item.swipe-list,.swipe-item.swipe-scores{flex:0 0 100%;width:100%;max-width:100%;scroll-snap-align:start;scroll-snap-stop:always}
+}
 .ued-footer{color:#6b7a90}.ued-footer a{color:var(--ued-blue);font-weight:600}
 @media (max-width:576px){.score-value{font-size:1.9rem}.ued-logo{width:64px;height:64px}}

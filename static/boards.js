@@ -78,18 +78,26 @@
         const w = weights();
         const empty2 = '<tr><td colspan="4" class="small text-muted">Chưa có môn. Tìm trong cơ sở dữ liệu hoặc quét ảnh và chọn Bảng 2.</td></tr>';
         mount.innerHTML = `
-        <div class="row g-3 align-items-start">
-          <div class="col-lg-5">
+        <div class="swipe-pills" role="tablist">
+          <button type="button" class="nav-pill active" data-swipe="0">Bảng 2</button>
+          <button type="button" class="nav-pill" data-swipe="1">Điểm học phần</button>
+        </div>
+        <div class="swipe-dots">
+          <button type="button" class="swipe-dot active" data-dot="0" aria-label="Bảng 2"></button>
+          <button type="button" class="swipe-dot" data-dot="1" aria-label="Điểm học phần"></button>
+        </div>
+        <div class="swipe-row" id="semesterSwipe">
+          <div class="swipe-item swipe-list">
             <div class="card p-3 mb-0">
               <h5 class="section-title">Bảng 2 — học kỳ hiện tại</h5>
               ${searchBox(2)}
-              <div class="table-responsive"><table class="table table-sm align-middle ued-table mb-0">
+              <div class="table-scroll"><table class="table table-sm align-middle ued-table">
                 <thead><tr><th>Môn</th><th class="text-center">TC</th><th class="text-center">Chữ</th><th></th></tr></thead>
                 <tbody>${t2.map(row2List).join('') || empty2}</tbody>
               </table></div>
             </div>
           </div>
-          <div class="col-lg-7">
+          <div class="swipe-item swipe-scores">
             <div class="card p-3 mb-0">
               <h5 class="section-title">Điểm học phần</h5>
               <div class="row g-2 mb-2 small">
@@ -98,7 +106,7 @@
                 <div class="col-4"><label class="form-label small mb-1">CK %</label><input id="wCk" class="form-control form-control-sm" type="number" min="0" max="100" value="${esc(savedWeight('wCk', 50))}"></div>
               </div>
               <p class="small text-muted mb-2">Điểm học phần = BP×${w[0].toFixed(2)} + GK×${w[1].toFixed(2)} + CK×${w[2].toFixed(2)}, làm tròn 1 số rồi xếp chữ theo QĐ 1586.</p>
-              <div class="table-responsive"><table class="table table-sm align-middle ued-table mb-0">
+              <div class="table-scroll table-wide"><table class="table table-sm align-middle ued-table">
                 <thead><tr><th>Môn</th><th>BP</th><th>GK</th><th>CK</th><th class="text-center">Điểm</th><th class="text-center">Chữ</th><th class="text-center">Hệ 4</th></tr></thead>
                 <tbody>${t2.map(row2Parts).join('') || '<tr><td colspan="7" class="small text-muted">Thêm môn ở Bảng 2 để nhập điểm thành phần.</td></tr>'}</tbody>
               </table></div>
@@ -158,10 +166,22 @@
             <td class="text-center">${c.points != null ? c.points : '—'}</td></tr>`;
     }
     function bind(mount) {
-        mount.querySelectorAll('.board-tabs button').forEach(btn => btn.addEventListener('click', () => {
-            mount.querySelectorAll('.board-tabs button').forEach(b => b.classList.toggle('active', b === btn));
-            mount.querySelectorAll('.board-col').forEach(col => col.classList.toggle('active', col.dataset.board === btn.dataset.board));
-        }));
+        const scroller = mount.querySelector('.swipe-row');
+        const mark = (index) => {
+            mount.querySelectorAll('[data-swipe]').forEach((b, n) => b.classList.toggle('active', n === index));
+            mount.querySelectorAll('[data-dot]').forEach((b, n) => b.classList.toggle('active', n === index));
+        };
+        const go = (index) => {
+            if (!scroller) return;
+            scroller.scrollTo({ left: index * scroller.clientWidth, behavior: 'smooth' });
+            mark(index);
+        };
+        mount.querySelectorAll('[data-swipe]').forEach(b => b.addEventListener('click', () => go(+b.dataset.swipe)));
+        mount.querySelectorAll('[data-dot]').forEach(b => b.addEventListener('click', () => go(+b.dataset.dot)));
+        if (scroller) scroller.addEventListener('scroll', () => {
+            const index = Math.round(scroller.scrollLeft / Math.max(1, scroller.clientWidth));
+            mark(index);
+        }, { passive: true });
         mount.querySelectorAll('.board-search').forEach(input => {
             let timer;
             input.addEventListener('input', () => {
