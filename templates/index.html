@@ -3,7 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0b4ea2">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Tính điểm">
     <title>UED Calculate Grade — Trường ĐH Sư phạm, ĐH Đà Nẵng</title>
+    <link rel="manifest" href="/manifest.webmanifest">
+    <script>
+        (function () {
+            try {
+                var saved = localStorage.getItem('ued_theme');
+                var dark = saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+            } catch (err) {}
+        })();
+    </script>
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" sizes="32x32">
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon-32.png') }}">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
@@ -39,10 +52,15 @@
             <button type="button" data-panel="bangdiem" class="active">Điểm tổng</button>
             <button type="button" data-panel="diemhp">Điểm học phần</button>
             <button type="button" data-panel="muctieu">Mục tiêu</button>
+            <button type="button" data-panel="lotrinh">Lộ trình</button>
+            <button type="button" data-panel="lich">Lịch</button>
             <button type="button" data-panel="drl">Điểm rèn luyện</button>
             <button type="button" data-panel="tintuc">Bảng tin</button>
             <button type="button" data-panel="huongdan">Hướng dẫn</button>
         </nav>
+        <button type="button" class="theme-btn" id="themeBtn" aria-label="Đổi nền sáng hoặc tối">
+            <i class="fas fa-moon" aria-hidden="true"></i>
+        </button>
     </div>
 </header>
 <main class="container py-4">
@@ -51,6 +69,17 @@
     <button type="button" id="dismissGuideHint" aria-label="Đóng gợi ý">×</button>
 </div>
 <section id="panel-bangdiem" class="tool-panel">
+    <div class="card p-3 mb-3 no-print">
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <label class="small fw-bold text-ued mb-0" for="profileSelect">Hồ sơ</label>
+            <select id="profileSelect" class="form-select form-select-sm" style="width:auto;min-width:10rem;max-width:16rem"></select>
+            <input id="profileName" class="form-control form-control-sm" style="width:9rem" placeholder="Tên hồ sơ" maxlength="40">
+            <button type="button" class="btn btn-sm btn-outline-ued" id="btnProfileAdd">Thêm</button>
+            <button type="button" class="btn btn-sm btn-outline-ued" id="btnProfileRename">Đổi tên</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" id="btnProfileDelete">Xóa hồ sơ</button>
+            <span id="saveStamp" class="small text-muted ms-auto">Tự lưu trên máy</span>
+        </div>
+    </div>
     <div class="row g-3 mb-4">
         <div class="col-md-4"><div class="card score-box old">
             <div class="score-label"><i class="fas fa-graduation-cap"></i> GPA hiện tại</div>
@@ -70,6 +99,12 @@
             <span class="fw-bold small text-ued d-flex align-items-center gap-2" id="progressText">0 / <input type="number" id="targetCredits" class="form-control form-control-sm d-inline-block" style="width:4.5rem" value="130" min="1"> TC</span>
         </div>
         <div class="progress"><div id="gradProgressBar" class="progress-bar" role="progressbar" style="width:0%">0%</div></div>
+    </div>
+
+    <div class="card p-3 mb-4 no-print">
+        <h5 class="section-title mb-2"><i class="fas fa-chart-column"></i> GPA theo học kỳ</h5>
+        <div class="chart-box"><canvas id="gpaChart" aria-label="Biểu đồ GPA học kỳ và CPA tích lũy"></canvas></div>
+        <p id="chartEmpty" class="small text-muted mb-0">Thêm môn đã gắn năm học và học kỳ để vẽ cột GPA và đường CPA.</p>
     </div>
 
     <div class="row g-4">
@@ -167,6 +202,8 @@
                     <div class="btn-group flex-wrap">
                         <button class="btn btn-sm btn-outline-ued" onclick="resetSimulation()">Reset giả lập</button>
                         <button class="btn btn-sm btn-outline-ued" onclick="exportTranscript()">Xuất JSON</button>
+                        <button class="btn btn-sm btn-outline-ued" id="btnPdf" type="button">Xuất PDF</button>
+                        <button class="btn btn-sm btn-outline-ued" id="btnXlsx" type="button">Xuất Excel</button>
                         <button class="btn btn-sm btn-outline-ued" onclick="window.print()">In</button>
                         <button class="btn btn-sm btn-outline-danger" onclick="clearAllData()">Xóa hết</button>
                     </div>
@@ -299,6 +336,71 @@
         <h5 class="section-title">Cần bao nhiêu để tới mốc xếp loại</h5>
         <p class="small text-muted">Phần còn lại = tổng tín chỉ chương trình trừ tín chỉ đã đạt (kể cả học phần P). Điểm các học phần đang F không được giữ — coi như sẽ được thay bằng lần học lại. Đây là mức trung bình hệ 4 trên số tín chỉ còn thiếu, không phải cam kết xét tốt nghiệp.</p>
         <div id="goalDetail"></div>
+    </div>
+</section>
+
+<section id="panel-lotrinh" class="tool-panel" hidden>
+    <div class="card p-3 p-md-4 mb-3">
+        <h5 class="section-title"><i class="fas fa-route"></i> Lộ trình tốt nghiệp</h5>
+        <p class="small text-muted">Chọn một trong 68 chương trình đã trích từ file CTĐT. Môn trong Điểm tổng được đối chiếu theo mã học phần, rồi theo tên, rồi theo tên gần đúng.</p>
+        <label class="form-label small" for="programSelect">Chương trình</label>
+        <select id="programSelect" class="form-select mb-3"></select>
+        <div id="roadSummary" class="road-summary mb-3"></div>
+        <div class="row g-3">
+            <div class="col-lg-6">
+                <h6 class="text-ued">Đã có trong bảng điểm</h6>
+                <div class="table-scroll"><table class="table table-sm ued-table mb-0"><thead><tr><th>Môn</th><th class="text-center">TC</th><th>Khớp</th></tr></thead><tbody id="roadDone"></tbody></table></div>
+            </div>
+            <div class="col-lg-6">
+                <h6 class="text-ued">Còn thiếu</h6>
+                <div class="table-scroll"><table class="table table-sm ued-table mb-0"><thead><tr><th>Môn</th><th class="text-center">TC</th><th>Mã</th></tr></thead><tbody id="roadMiss"></tbody></table></div>
+            </div>
+        </div>
+        <p id="roadNote" class="small text-muted mt-2 mb-0"></p>
+    </div>
+</section>
+
+<section id="panel-lich" class="tool-panel" hidden>
+    <div class="row g-3">
+        <div class="col-lg-7">
+            <div class="card p-3 p-md-4 mb-3">
+                <h5 class="section-title"><i class="fas fa-calendar-week"></i> Thời khóa biểu</h5>
+                <div class="row g-2 align-items-end mb-2">
+                    <div class="col-12 col-md-4"><label class="form-label small" for="ttName">Môn</label><input id="ttName" class="form-control form-control-sm" placeholder="Giải tích"></div>
+                    <div class="col-6 col-md-2"><label class="form-label small" for="ttDay">Thứ</label>
+                        <select id="ttDay" class="form-select form-select-sm">
+                            <option value="2">Thứ 2</option><option value="3">Thứ 3</option><option value="4">Thứ 4</option>
+                            <option value="5">Thứ 5</option><option value="6">Thứ 6</option><option value="7">Thứ 7</option><option value="8">Chủ nhật</option>
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-2"><label class="form-label small" for="ttStart">Từ</label><input id="ttStart" class="form-control form-control-sm" type="time" value="07:00"></div>
+                    <div class="col-6 col-md-2"><label class="form-label small" for="ttEnd">Đến</label><input id="ttEnd" class="form-control form-control-sm" type="time" value="08:50"></div>
+                    <div class="col-6 col-md-2"><label class="form-label small" for="ttRoom">Phòng</label><input id="ttRoom" class="form-control form-control-sm" placeholder="A101"></div>
+                </div>
+                <button type="button" class="btn btn-sm btn-ued mb-3" id="btnAddClass">Thêm tiết</button>
+                <div class="table-scroll">
+                    <table class="table table-sm ued-table mb-0"><thead><tr><th>Môn</th><th>Thứ</th><th>Giờ</th><th>Phòng</th><th></th></tr></thead><tbody id="ttBody"></tbody></table>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="card p-3 p-md-4 mb-3">
+                <h5 class="section-title"><i class="fas fa-stopwatch"></i> Lịch thi</h5>
+                <div class="row g-2 align-items-end mb-2">
+                    <div class="col-12"><label class="form-label small" for="exName">Môn thi</label><input id="exName" class="form-control form-control-sm"></div>
+                    <div class="col-7"><label class="form-label small" for="exWhen">Ngày giờ</label><input id="exWhen" class="form-control form-control-sm" type="datetime-local"></div>
+                    <div class="col-5"><label class="form-label small" for="exRoom">Phòng</label><input id="exRoom" class="form-control form-control-sm"></div>
+                </div>
+                <button type="button" class="btn btn-sm btn-ued mb-3" id="btnAddExam">Thêm lịch thi</button>
+                <div id="exList" class="d-flex flex-column gap-2"></div>
+            </div>
+            <div class="card p-3">
+                <label class="form-label small" for="ttStartDate">Tuần bắt đầu (để xuất lịch)</label>
+                <input id="ttStartDate" class="form-control form-control-sm mb-2" type="date">
+                <button type="button" class="btn btn-sm btn-outline-ued" id="btnIcs">Xuất tệp .ics</button>
+                <p class="small text-muted mt-2 mb-0">Tiết học lặp 15 tuần. Lịch thi là một sự kiện. Mở tệp bằng Lịch của điện thoại.</p>
+            </div>
+        </div>
     </div>
 </section>
 
@@ -609,6 +711,7 @@
     · Điểm: Thông tư 08/2021 và QĐ 1473/QĐ-ĐHSP-ĐT
     · Bảng tin: bài công khai ued.udn.vn
 </footer>
+<div id="printPack" class="print-pack"></div>
 <div id="cropModal" class="crop-modal" hidden>
     <div class="crop-sheet" role="dialog" aria-modal="true" aria-labelledby="cropTitle">
         <h5 id="cropTitle" class="section-title mb-1">Cắt ảnh trước khi quét</h5>
@@ -632,9 +735,11 @@
         </div>
     </div>
 </div>
+<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
 <script src="{{ url_for('static', filename='crop.js') }}"></script>
 <script src="{{ url_for('static', filename='script.js') }}"></script>
 <script src="{{ url_for('static', filename='boards.js') }}"></script>
 <script src="{{ url_for('static', filename='academics-ui.js') }}"></script>
+<script src="{{ url_for('static', filename='studio.js') }}"></script>
 </body>
 </html>

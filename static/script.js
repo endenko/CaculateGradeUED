@@ -1,11 +1,43 @@
+(function () {
+    try {
+        var raw = localStorage.getItem('ued_profiles_v1');
+        if (!raw) {
+            var first = {
+                active: 'mac-dinh',
+                items: [{
+                    id: 'mac-dinh',
+                    name: 'Mặc định',
+                    transcript: JSON.parse(localStorage.getItem('kanna_transcript_v2') || '[]'),
+                    table2: JSON.parse(localStorage.getItem('ued_table2') || '[]'),
+                    weights: JSON.parse(localStorage.getItem('ued_weights') || 'null'),
+                    schedule: JSON.parse(localStorage.getItem('ued_schedule_v1') || 'null'),
+                    program: localStorage.getItem('ued_program') || ''
+                }]
+            };
+            localStorage.setItem('ued_profiles_v1', JSON.stringify(first));
+        } else {
+            var store = JSON.parse(raw);
+            var active = (store.items || []).filter(function (item) { return item.id === store.active; })[0] || (store.items || [])[0];
+            if (active) {
+                localStorage.setItem('kanna_transcript_v2', JSON.stringify(active.transcript || []));
+                localStorage.setItem('ued_table2', JSON.stringify(active.table2 || []));
+                if (active.weights) localStorage.setItem('ued_weights', JSON.stringify(active.weights));
+                if (active.schedule) localStorage.setItem('ued_schedule_v1', JSON.stringify(active.schedule));
+                if (active.program != null) localStorage.setItem('ued_program', active.program);
+            }
+        }
+    } catch (err) { /* keep the raw transcript key */ }
+})();
 var transcriptData = JSON.parse(localStorage.getItem('kanna_transcript_v2')) || [];
 const gradeMap = { 'A+': 4.0, 'A': 4.0, 'B+': 3.5, 'B': 3.0, 'C+': 2.5, 'C': 2.0, 'D+': 1.5, 'D': 1.0, 'F': 0.0 };
 
 function saveData() {
     localStorage.setItem('kanna_transcript_v2', JSON.stringify(transcriptData));
+    if (window.syncProfile) window.syncProfile();
     renderTable();
     calculateStats();
     if (window.refreshAcademics) window.refreshAcademics();
+    if (window.studioRefresh) window.studioRefresh();
 }
 
 let debounceTimer;

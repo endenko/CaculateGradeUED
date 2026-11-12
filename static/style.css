@@ -27,7 +27,15 @@ body{font-family:'Be Vietnam Pro',system-ui,sans-serif;background:linear-gradien
 .menu-btn[aria-expanded="true"] .menu-bars span:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
 .menu-bars span{transition:transform .15s ease, opacity .15s ease}
 .site-menu{margin-left:auto;display:flex;align-items:center;gap:.05rem;flex-wrap:nowrap}
-.site-menu button{background:none;border:0;color:var(--ued-blue);font-weight:700;font-size:.82rem;padding:.45rem .45rem;border-bottom:2px solid transparent;white-space:nowrap}
+.site-menu button{background:none;border:0;color:var(--ued-blue);font-weight:700;font-size:.76rem;padding:.45rem .32rem;border-bottom:2px solid transparent;white-space:nowrap}
+.theme-btn{margin-left:.35rem;width:40px;height:40px;border:1px solid #d6e0ee;background:#fff;border-radius:8px;color:var(--ued-blue);flex-shrink:0}
+.theme-btn:focus-visible{outline:2px solid var(--ued-gold);outline-offset:2px}
+.chart-box{height:240px}
+.exam-row{display:flex;justify-content:space-between;gap:.6rem;padding:.45rem 0;border-bottom:1px solid #eef2f7}
+.exam-count{font-weight:800;color:var(--ued-blue);font-size:.85rem}
+.print-pack{display:none}
+.print-pack table{width:100%;border-collapse:collapse;margin-bottom:1rem;font-size:12px}
+.print-pack th,.print-pack td{border:1px solid #ccc;padding:.25rem .35rem;text-align:left}
 .site-menu button.active,.site-menu button:hover{color:var(--ued-blue-dark);border-bottom-color:var(--ued-gold)}
 .warn-chip{background:#fff6f4;border-left:4px solid #c0392b;padding:.4rem .6rem;border-radius:8px;margin-bottom:.4rem}
 .goal-row{padding:.45rem 0;border-bottom:1px solid #eef2f7}
@@ -44,7 +52,8 @@ body{font-family:'Be Vietnam Pro',system-ui,sans-serif;background:linear-gradien
   .brand-uni{font-size:.52rem;letter-spacing:.06em}
   .brand-app{display:none}
   .site-head-row{min-height:48px;gap:.4rem}
-  .menu-btn{display:inline-flex}
+  .theme-btn{margin-left:auto}
+  .menu-btn{display:inline-flex;margin-left:.35rem}
   .site-menu{display:none;position:absolute;left:0;right:0;top:100%;margin:0;background:#fff;flex-direction:column;align-items:stretch;padding:.15rem .9rem .7rem;border-bottom:3px solid var(--ued-gold);box-shadow:0 14px 28px rgba(6,47,102,.14);z-index:50}
   .site-menu.open{display:flex}
   .site-menu button{text-align:left;padding:.7rem .1rem;border-bottom:1px solid #eef2f7;font-size:.95rem}
@@ -53,8 +62,8 @@ body{font-family:'Be Vietnam Pro',system-ui,sans-serif;background:linear-gradien
   .site-top .top-stat{display:none}
 }
 @media print{
-  .no-print,.site-head,.site-top,.tool-panel[hidden]{display:none!important}
-  #panel-bangdiem{display:block!important}
+  .no-print,.site-head,.site-top,.tool-panel,.ued-footer,#cropModal{display:none!important}
+  .print-pack{display:block!important;color:#111}
   body{background:#fff}
   .card{box-shadow:none;border:1px solid #ddd}
 }
@@ -195,3 +204,35 @@ body.crop-open{overflow:hidden}
 .btn-sua{border:1px solid var(--ued-blue);color:var(--ued-blue);background:#fff;border-radius:8px;font-weight:700;font-size:.78rem;padding:.2rem .55rem}
 .ued-footer{color:#6b7a90}.ued-footer a{color:var(--ued-blue);font-weight:600}
 @media (max-width:576px){.score-value{font-size:1.9rem}.ued-logo{width:64px;height:64px}}
+html[data-theme="dark"]{
+  color-scheme:dark;
+  --ued-blue:#8eb6f0; --ued-blue-dark:#e7eefc; --ued-blue-soft:#1a2c46;
+  --text:#e7eef8; --card:#14233a; --line:#243956; --muted:#a9bdd4;
+}
+html[data-theme="dark"] body{background:#0c1726;color:var(--text)}
+html[data-theme="dark"] .site-head{background:#101c2e;border-bottom-color:#8eb6f0}
+html[data-theme="dark"] .theme-btn,html[data-theme="dark"] .menu-btn{background:#101c2e;border-color:#2c4668;color:#e7eef8}
+html[data-theme="dark"] .menu-bars span{background:#e7eef8}
+html[data-theme="dark"] .site-menu,html[data-theme="dark"] .site-menu.open{background:#101c2e}
+html[data-theme="dark"] .site-menu button{color:#d6e4ff}
+html[data-theme="dark"] .site-menu button.active,html[data-theme="dark"] .site-menu button:hover{color:#f5b800}
+html[data-theme="dark"] .card{background:#14233a;color:var(--text)}
+html[data-theme="dark"] .form-control,html[data-theme="dark"] .form-select{background:#0e1b2e;color:#e7eef8;border-color:#2c4668}
+html[data-theme="dark"] .form-control::placeholder{color:#8ea3bd}
+html[data-theme="dark"] .table{color:#e7eef8;--bs-table-bg:transparent;--bs-table-color:#e7eef8}
+html[data-theme="dark"] .table-hover>tbody>tr:hover>*{color:#fff;background:#1b314e}
+html[data-theme="dark"] .text-muted,html[data-theme="dark"] .form-label{color:#a9bdd4!important}
+html[data-theme="dark"] .suggestions-box{background:#14233a;color:#e7eef8}
+html[data-theme="dark"] .ued-footer{color:#a9bdd4}
+html[data-theme="dark"] .cpa-stats div{background:#0e1b2e}
+html[data-theme="dark"] .guide-hint{background:#243044;color:#e7eef8}
+html[data-theme="dark"] .progress{background:#0e1b2e}
+html[data-theme="dark"] .score-box.old{background:linear-gradient(135deg,#0b4ea2,#2f7be0);color:#fff}
+html[data-theme="dark"] .score-box.new{background:linear-gradient(135deg,#c99400,#f5b800);color:#3b2a00}
+html[data-theme="dark"] .score-box.diff{background:#101c2e;color:#e7eef8;border-color:#8eb6f0}
+html[data-theme="dark"] .score-box.up{background:linear-gradient(135deg,#198754,#38c172);color:#fff}
+html[data-theme="dark"] .score-box.down{background:linear-gradient(135deg,#c0392b,#e55b4d);color:#fff}
+html[data-theme="dark"] .ued-table thead th{background:#0b4ea2;color:#fff}
+html[data-theme="dark"] .btn-ued,html[data-theme="dark"] .btn-ued-dark{background:#0b4ea2;color:#fff}
+html[data-theme="dark"] .progress-bar{background:#f5b800;color:#062f66}
+html[data-theme="dark"] .exam-row{border-bottom-color:#243956}

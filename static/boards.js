@@ -89,7 +89,19 @@
         return own.concat(extra);
     }
     function visible() { return rowsForView(); }
-    function save() { localStorage.setItem('ued_table2', JSON.stringify(t2)); }
+    function save() {
+        localStorage.setItem('ued_table2', JSON.stringify(t2));
+        if (window.syncProfile) window.syncProfile();
+    }
+    window.boardsSnapshot = function () { return JSON.parse(JSON.stringify(t2)); };
+    window.boardsReplace = function (rows) {
+        t2 = Array.isArray(rows) ? rows : [];
+        localStorage.setItem('ued_table2', JSON.stringify(t2));
+        fillSemSelect();
+        renderBody();
+        renderOptions();
+        renderOverall();
+    };
     function blank(partial) {
         return Object.assign({
             id: uid(), ten_mon: '', tin_chi: 3, letter: null, points: null, score10: null,

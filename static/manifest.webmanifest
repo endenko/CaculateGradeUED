@@ -1,0 +1,16 @@
+{
+  "name": "Tính điểm UED",
+  "short_name": "Tính điểm",
+  "description": "Tính điểm, lộ trình và lịch học cho sinh viên Trường Đại học Sư phạm, Đại học Đà Nẵng",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "lang": "vi",
+  "background_color": "#0b4ea2",
+  "theme_color": "#0b4ea2",
+  "icons": [
+    { "src": "/static/favicon-32.png", "sizes": "32x32", "type": "image/png" },
+    { "src": "/static/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/static/ued-logo.png", "sizes": "192x192", "type": "image/png", "purpose": "any" }
+  ]
+}

@@ -20,13 +20,15 @@ os.environ.setdefault("RAPID_LIMIT_SIDE", "960")
 import re
 from rapidfuzz import fuzz, process
 
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, Response, render_template, request, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
 
 import db
+import export_xlsx
 import newsfeed
 import ocr_queue
 import regulations
+import roadmap
 import solver
 from ocr import engines
 from utils import no_accent_vietnamese, normalize
@@ -579,6 +581,63 @@ def health():
 @app.route('/api/stats')
 def api_stats():
     return jsonify(db.stats())
+
+
+@app.route('/api/programs')
+def api_programs():
+    return jsonify(roadmap.list_programs())
+
+
+@app.route('/api/roadmap', methods=['POST'])
+def api_roadmap():
+    data = request.get_json(silent=True) or {}
+    return jsonify(roadmap.build_roadmap(data.get('nganh') or '', data.get('courses') or []))
+
+
+@app.route('/api/gpa_series', methods=['POST'])
+def api_gpa_series():
+    data = request.get_json(silent=True) or {}
+    try:
+        out = regulations.summarize({
+            "courses": data.get("courses") or [],
+            "program_credits": data.get("program_credits") or 130,
+            "rule": data.get("rule") or "qd1586",
+        })
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    return jsonify({"success": True, "semesters": out["semesters"], "cumulative": out["cumulative"]})
+
+
+@app.route('/api/export.xlsx', methods=['POST'])
+def api_export_xlsx():
+    data = request.get_json(silent=True) or {}
+    body = export_xlsx.build_xlsx(export_xlsx.grade_sheets(data))
+    return Response(
+        body,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': 'attachment; filename="bang-diem-ued.xlsx"'},
+    )
+
+
+@app.route('/sw.js')
+def service_worker():
+    resp = send_from_directory(app.static_folder, 'sw.js')
+    resp.headers['Content-Type'] = 'application/javascript; charset=utf-8'
+    resp.headers['Service-Worker-Allowed'] = '/'
+    resp.headers['Cache-Control'] = 'no-cache'
+    return resp
+
+
+@app.route('/manifest.webmanifest')
+def web_manifest():
+    resp = send_from_directory(app.static_folder, 'manifest.webmanifest')
+    resp.headers['Content-Type'] = 'application/manifest+json; charset=utf-8'
+    return resp
+
+
+@app.route('/offline.html')
+def offline_page():
+    return send_from_directory(app.static_folder, 'offline.html')
 
 
 @app.route('/api/faculties')
