@@ -36,6 +36,8 @@ from flask_limiter.util import get_remote_address
 
 app = Flask(__name__)
 limiter = Limiter(key_func=get_remote_address, app=app, default_limits=[], storage_uri="memory://")
+# One bucket for both OCR entry points so /api/process_ocr cannot dodge the cap.
+ocr_limit = limiter.shared_limit("5 per minute; 30 per hour", scope="ocr")
 
 # --- CẤU HÌNH (từ biến môi trường, không còn đường dẫn Windows cứng) ---
 UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', '/tmp/uploads' if os.environ.get('VERCEL') else 'uploads')
@@ -557,11 +559,20 @@ def home():
 
 @app.route('/health')
 def health():
+    try:
+        ocr_queue.queue.ensure()
+        worker_alive = ocr_queue.queue.worker_alive()
+    except Exception:
+        app.logger.exception("OCR queue health check failed")
+        worker_alive = False
+    if not worker_alive:
+        app.logger.error("OCR queue consumer is not alive in pid %s", os.getpid())
     return jsonify({
         "success": True,
         "status": "ok",
         "ocr": engines.engine_status(),
-        "queue_worker": ocr_queue.queue.worker_alive(),
+        "queue_worker": worker_alive,
+        "queue_pid": os.getpid(),
     })
 
 
@@ -667,15 +678,20 @@ def _save_upload():
 
 
 @app.route('/api/ocr/jobs', methods=['POST'])
-@limiter.limit("5 per minute; 30 per hour")
+@ocr_limit
 def ocr_job_submit():
     path, err = _save_upload()
     if err:
         return err
     mode = request.form.get('mode', 'computer')
     ticket = ocr_queue.queue.submit(path, mode)
-    code = 200 if ticket.get("accepted", True) else 429
-    return jsonify(ticket), code
+    if not ticket.get("accepted", True):
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+        return jsonify(ticket), 429
+    return jsonify(ticket)
 
 
 @app.route('/api/ocr/jobs/<job_id>')
@@ -687,14 +703,26 @@ def ocr_job_status(job_id):
 
 
 @app.route('/api/process_ocr', methods=['POST'])
-@limiter.limit("5 per minute; 30 per hour")
+@ocr_limit
 def process_ocr():
-    """Giữ lối gọi đồng bộ cho công cụ cũ. Giao diện dùng hàng đợi /api/ocr/jobs."""
+    """Synchronous OCR. Same queue and rate limit as /api/ocr/jobs."""
     path, err = _save_upload()
     if err:
         return err
     mode = request.form.get('mode', 'computer')
-    return jsonify(_run_ocr_file(path, request.form.get('mode', mode)))
+    ticket = ocr_queue.queue.submit(path, mode)
+    if not ticket.get("accepted", True):
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+        return jsonify({"success": False, "error": ticket.get("error") or "Hàng đợi OCR đang đầy"}), 429
+    info = ocr_queue.queue.wait(ticket["id"], timeout=110)
+    if info.get("status") == "done":
+        return jsonify(info.get("result") or {"success": False, "error": "OCR không trả kết quả"})
+    if info.get("status") == "error":
+        return jsonify(info.get("result") or {"success": False, "error": info.get("error") or "OCR lỗi"})
+    return jsonify({"success": False, "error": "OCR quá thời gian chờ hàng đợi"}), 504
 
 
 @app.route('/api/scan_detail_score', methods=['POST'])

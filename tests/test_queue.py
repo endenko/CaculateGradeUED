@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import tempfile
+import threading
 import time
 import unittest
 
@@ -48,6 +49,7 @@ class QueueTests(unittest.TestCase):
             return {"success": True, "data": [path], "engine": mode}
 
         q.set_runner(runner)
+        q.ensure()
         self.assertTrue(q.worker_alive())
         read_fd, write_fd = os.pipe()
         pid = os.fork()
@@ -73,6 +75,30 @@ class QueueTests(unittest.TestCase):
             state = handle.read()
         os.waitpid(pid, 0)
         self.assertEqual(state, "done")
+
+    def test_parent_thread_that_still_looks_alive_is_replaced(self):
+        """After preload+fork, Thread.is_alive() can stay True for a dead parent thread."""
+        q = ocr_queue.OcrQueue()
+
+        class Ghost(threading.Thread):
+            def is_alive(self):  # noqa: D102
+                return True
+
+        q._thread = Ghost(name="ghost")
+        q._owner_pid = os.getpid() + 999
+        q.set_runner(lambda path, mode: {"success": True, "data": [mode], "engine": "fake"})
+        ticket = q.submit("img", "computer")
+        deadline = time.time() + 3
+        state = "timeout"
+        while time.time() < deadline:
+            state = q.status(ticket["id"])["status"]
+            if state in ("done", "error"):
+                break
+            time.sleep(0.02)
+        self.assertEqual(state, "done")
+        self.assertNotIsInstance(q._thread, Ghost)
+        self.assertEqual(q._owner_pid, os.getpid())
+        self.assertTrue(q.worker_alive())
 
 
 if __name__ == "__main__":

@@ -9,12 +9,14 @@ lại luồng tiêu thụ trong process đang phục vụ request.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import threading
 import time
-import traceback
 import uuid
 from collections import OrderedDict
+
+log = logging.getLogger("ocr_queue")
 
 # Render free (~0.1 CPU) takes about 26s for a real portal page. Use that until
 # this process has its own recent durations.
@@ -31,7 +33,9 @@ class OcrQueue:
         self._samples = len(self._recent)
         self._runner = None
         self._thread = None
+        self._owner_pid = None
         self._rebuild_sync()
+        self._locks_pid = os.getpid()
         if hasattr(os, "register_at_fork"):
             os.register_at_fork(after_in_child=self._after_fork_child)
 
@@ -42,36 +46,68 @@ class OcrQueue:
         self._boot_lock = threading.Lock()
 
     def _after_fork_child(self):
-        """Chạy trong process con, trước khi threading kịp reset. Không tạo thread ở đây."""
+        """Process con của gunicorn --preload không kế thừa luồng. Không start thread ở đây."""
         self._thread = None
-        self._rebuild_sync()
-        for job in self._jobs.values():
+        self._owner_pid = None
+        self._locks_pid = None
+        try:
+            self._rebuild_sync()
+            self._locks_pid = os.getpid()
+        except Exception:
+            log.exception("OCR queue failed to rebuild locks after fork")
+        for job in list(self._jobs.values()):
             if job.get("status") == "running":
                 job["status"] = "queued"
                 job["started"] = None
+        log.warning("OCR consumer dropped by fork; will start on the next request in pid %s", os.getpid())
 
     def set_runner(self, fn):
+        # Không start thread lúc import: gunicorn --preload import trong master rồi fork,
+        # thread master chết trong worker nhưng object có thể vẫn is_alive().
         self._runner = fn
-        self.ensure()
+
+    def _thread_looks_alive(self) -> bool:
+        thread = self._thread
+        if thread is None:
+            return False
+        try:
+            return bool(thread.is_alive())
+        except Exception:
+            log.exception("OCR consumer is_alive() failed")
+            return False
 
     def worker_alive(self) -> bool:
-        thread = self._thread
-        return bool(thread is not None and thread.is_alive())
+        return self._owner_pid == os.getpid() and self._thread_looks_alive()
 
     def ensure(self):
-        """Bật luồng tiêu thụ nếu process này chưa có (sau fork hoặc sau khi luồng chết)."""
+        """Start the consumer in the process that is serving this call."""
+        pid = os.getpid()
         with self._boot_lock:
-            thread = self._thread
-            if thread is not None and thread.is_alive():
+            if self._owner_pid == pid and self._thread_looks_alive():
                 return
+            if self._thread is not None:
+                log.warning(
+                    "OCR consumer unusable (alive=%s owner_pid=%s this_pid=%s); starting a new one",
+                    self._thread_looks_alive(),
+                    self._owner_pid,
+                    pid,
+                )
+            if self._locks_pid != pid:
+                self._rebuild_sync()
+                self._locks_pid = pid
+                log.info("OCR queue locks rebuilt in pid %s", pid)
             with self._cv:
                 for job in self._jobs.values():
                     if job.get("status") == "running":
                         job["status"] = "queued"
                         job["started"] = None
                 self._cv.notify_all()
-            self._thread = threading.Thread(target=self._loop, name="ocr-queue", daemon=True)
+            self._owner_pid = pid
+            self._thread = threading.Thread(
+                target=self._loop, name=f"ocr-queue-{pid}", daemon=True,
+            )
             self._thread.start()
+            log.info("OCR queue consumer started pid=%s ident=%s", pid, self._thread.ident)
 
     def submit(self, path: str, mode: str) -> dict:
         self.ensure()
@@ -131,7 +167,7 @@ class OcrQueue:
             try:
                 self._run_one()
             except Exception:
-                traceback.print_exc()
+                log.exception("OCR queue loop failed in pid %s", os.getpid())
                 time.sleep(0.3)
 
     def _run_one(self):
@@ -155,6 +191,7 @@ class OcrQueue:
                 result = None
                 error = "OCR lỗi"
         except Exception as exc:  # noqa: BLE001
+            log.exception("OCR job %s crashed", job_id)
             result = None
             error = str(exc)
         finished = time.time()
@@ -174,6 +211,20 @@ class OcrQueue:
                 self._avg = _mean(self._recent)
                 _save_recent(self._recent)
         _trim_memory()
+
+    def wait(self, job_id: str, timeout: float) -> dict:
+        """Block until the job finishes. Restarts a dead consumer while waiting."""
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            info = self.status(job_id)
+            if not info.get("found") or info.get("status") in ("done", "error"):
+                return info
+            if not info.get("worker_alive"):
+                log.error("OCR job %s is %s but the consumer is dead in pid %s", job_id, info.get("status"), os.getpid())
+                self.ensure()
+            time.sleep(0.05)
+        log.error("OCR job %s timed out after %ss", job_id, timeout)
+        return self.status(job_id)
 
 
 def _mean(values):
