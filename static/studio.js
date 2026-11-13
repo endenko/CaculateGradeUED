@@ -3,6 +3,49 @@
     const $ = (id) => document.getElementById(id);
     const DAYS = { 2: 'Thứ 2', 3: 'Thứ 3', 4: 'Thứ 4', 5: 'Thứ 5', 6: 'Thứ 6', 7: 'Thứ 7', 8: 'Chủ nhật' };
     const ICS_DAY = { 2: 'MO', 3: 'TU', 4: 'WE', 5: 'TH', 6: 'FR', 7: 'SA', 8: 'SU' };
+
+    function gcalStamp(date) {
+        const pad = (n) => String(n).padStart(2, '0');
+        return date.getFullYear() + pad(date.getMonth() + 1) + pad(date.getDate()) + 'T' + pad(date.getHours()) + pad(date.getMinutes()) + '00';
+    }
+
+    function gcalUrl(title, start, end, location, details) {
+        const query = new URLSearchParams({
+            action: 'TEMPLATE',
+            text: title,
+            dates: gcalStamp(start) + '/' + gcalStamp(end),
+            location: location || '',
+            details: details || '',
+        });
+        return 'https://calendar.google.com/calendar/render?' + query.toString();
+    }
+
+    function nextClassDate(item) {
+        const start = new Date((item.week_start || '2026-08-17') + 'T00:00:00');
+        const weeks = (item.weeks && item.weeks.length) ? item.weeks : [1];
+        const week = weeks[0];
+        const offset = item.day === 8 ? 6 : (item.day - 2);
+        const day = new Date(start.getTime() + ((week - 1) * 7 + offset) * 86400000);
+        const [sh, sm] = (item.start || '07:00').split(':').map(Number);
+        const [eh, em] = (item.end || '07:50').split(':').map(Number);
+        return [
+            new Date(day.getFullYear(), day.getMonth(), day.getDate(), sh || 0, sm || 0),
+            new Date(day.getFullYear(), day.getMonth(), day.getDate(), eh || 0, em || 0),
+        ];
+    }
+
+    function gcalClass(item) {
+        const [start, end] = nextClassDate(item);
+        const weeks = (item.weeks || []).join(', ');
+        return gcalUrl(item.name, start, end, item.room, weeks ? 'Tuần ' + weeks : '');
+    }
+
+    function gcalExam(item) {
+        const when = new Date(item.at);
+        if (Number.isNaN(when.getTime())) return '#';
+        const end = new Date(when.getTime() + 90 * 60000);
+        return gcalUrl('Thi ' + item.name, when, end, item.room, item.hinh_thuc || '');
+    }
     let chart = null;
     let chartTimer = null;
 
@@ -334,11 +377,11 @@
             const rows = data.classes.slice().sort((a, b) => a.day - b.day || a.start.localeCompare(b.start));
             body.innerHTML = rows.length ? rows.map(item => `
                 <tr>
-                    <td>${esc(item.name)}</td>
-                    <td>${DAYS[item.day] || ''}</td>
+                    <td>${esc(item.name)}${item.ma_hp ? `<div class="small text-muted">${esc(item.ma_hp)}</div>` : ''}${item.lecturer ? `<div class="small">${esc(item.lecturer)}</div>` : ''}</td>
+                    <td>${DAYS[item.day] || ''}${item.weeks ? `<div class="small text-muted">Tuần ${esc(item.weeks.join(','))}</div>` : ''}</td>
                     <td>${esc(item.start)}–${esc(item.end)}</td>
                     <td>${esc(item.room)}</td>
-                    <td class="text-center"><button type="button" class="btn btn-sm btn-link text-danger p-0" data-del-class="${esc(item.id)}">Xóa</button></td>
+                    <td class="text-center"><a class="small" target="_blank" rel="noopener" href="${gcalClass(item)}">Google</a> <button type="button" class="btn btn-sm btn-link text-danger p-0" data-del-class="${esc(item.id)}">Xóa</button></td>
                 </tr>`).join('') : '<tr><td colspan="5" class="text-muted small">Chưa có tiết nào.</td></tr>';
         }
         const list = $('exList');
@@ -359,7 +402,7 @@
                 const label = Number.isNaN(when.getTime()) ? item.at : when.toLocaleString('vi-VN', { hour12: false });
                 return `<div class="exam-row">
                     <div><b>${esc(item.name)}</b><div class="small text-muted">${esc(label)}${item.room ? ' · ' + esc(item.room) : ''}</div></div>
-                    <div class="text-end"><div class="exam-count">${count}</div><button type="button" class="btn btn-sm btn-link text-danger p-0" data-del-exam="${esc(item.id)}">Xóa</button></div>
+                    <div class="text-end"><div class="exam-count">${count}</div><a class="small" target="_blank" rel="noopener" href="${gcalExam(item)}">Google</a> <button type="button" class="btn btn-sm btn-link text-danger p-0" data-del-exam="${esc(item.id)}">Xóa</button></div>
                 </div>`;
             }).join('') : '<p class="small text-muted mb-0">Chưa có lịch thi.</p>';
         }

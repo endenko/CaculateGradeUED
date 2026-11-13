@@ -407,6 +407,26 @@
 </section>
 
 <section id="panel-lich" class="tool-panel" hidden>
+    <div class="card p-3 mb-3" id="cardScheduleImport">
+        <h5 class="section-title"><i class="fas fa-file-image"></i> Đưa lịch từ ảnh QLHT</h5>
+        <p class="small text-muted">Chụp màn hình Lịch thi hoặc Thời khoá biểu trên cổng sinh viên. Kiểm tra từng dòng rồi mới lưu. Giờ tiết là mặc định, sửa được.</p>
+        <div class="d-flex flex-wrap gap-2">
+            <label class="btn btn-sm btn-outline-ued mb-0">Quét lịch thi<input id="fileExam" type="file" accept="image/*" hidden></label>
+            <label class="btn btn-sm btn-outline-ued mb-0">Quét thời khoá biểu<input id="fileTimetable" type="file" accept="image/*" hidden></label>
+        </div>
+        <div id="scheduleReview" class="mt-3" hidden></div>
+    </div>
+    <div class="card p-3 mb-3" id="cardCalendar">
+        <h5 class="section-title"><i class="fas fa-calendar-plus"></i> Google Calendar</h5>
+        <p class="small text-muted">Mỗi dòng có nút thêm một sự kiện. Liên kết .ics để Google tự cập nhật và báo trên điện thoại. OAuth chỉ hiện khi máy chủ đã cấu hình.</p>
+        <div class="d-flex flex-wrap gap-2 mb-2">
+            <button type="button" class="btn btn-sm btn-ued" id="btnCalFeed">Tạo liên kết đăng ký</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" id="btnCalRevoke">Thu hồi liên kết</button>
+            <a class="btn btn-sm btn-outline-ued" id="btnGoogleSync" hidden href="/api/calendar/google/start">Đồng bộ Google (OAuth)</a>
+        </div>
+        <input id="calFeedUrl" class="form-control form-control-sm mb-1" readonly placeholder="Liên kết .ics">
+        <p id="calFeedHelp" class="small text-muted mb-0">Trong Google Calendar: Thêm lịch khác → Từ URL, dán liên kết https. Trên điện thoại mở liên kết webcal.</p>
+    </div>
     <div class="row g-3">
         <div class="col-lg-7">
             <div class="card p-3 p-md-4 mb-3">
@@ -827,6 +847,7 @@
 <script src="{{ url_for('static', filename='boards.js') }}"></script>
 <script src="{{ url_for('static', filename='academics-ui.js') }}"></script>
 <script src="{{ url_for('static', filename='studio.js') }}"></script>
+<script src="{{ url_for('static', filename='schedule-ui.js') }}"></script>
 <script src="{{ url_for('static', filename='advise.js') }}"></script>
 </body>
 </html>

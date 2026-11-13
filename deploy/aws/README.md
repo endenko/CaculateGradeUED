@@ -86,3 +86,14 @@ when you terminate the instance:
 aws ec2 release-address --allocation-id "$ALLOC" --region "$REGION"
 aws ec2 terminate-instances --instance-ids "$INSTANCE" --region "$REGION"
 ```
+
+## Google Calendar OAuth
+
+The Lịch tab always offers a one-off Google event link and a private `.ics` feed. The “Đồng bộ Google (OAuth)” button stays hidden until both variables exist on the instance:
+
+```bash
+GOOGLE_CLIENT_ID=....apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=...
+```
+
+In Google Cloud Console, create an OAuth client of type Web application. Add the authorized redirect URI `http://YOUR_PUBLIC_IP/api/calendar/google/callback` (or `https://` if you terminate TLS). The scope used is `https://www.googleapis.com/auth/calendar.events`. Put the two variables in the instance environment and restart the container. Without them, nothing calls Google.

@@ -31,6 +31,8 @@ import regulations
 import roadmap
 import solver
 import advising
+import calendar_feed
+import schedule_ocr
 from ocr import engines
 from utils import no_accent_vietnamese, normalize
 from flask_limiter import Limiter
@@ -669,6 +671,85 @@ def api_advise():
         })
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
+
+
+@app.route('/api/calendar/feed', methods=['POST'])
+def calendar_feed_create():
+    data = request.get_json(silent=True) or {}
+    token = calendar_feed.save_feed(data.get("schedule") or {}, data.get("previous") or "")
+    base = request.host_url.rstrip("/")
+    return jsonify({
+        "success": True,
+        "token": token,
+        "https": f"{base}/cal/{token}.ics",
+        "webcal": f"webcal://{request.host}/cal/{token}.ics",
+    })
+
+
+@app.route('/api/calendar/feed/revoke', methods=['POST'])
+def calendar_feed_revoke():
+    calendar_feed.revoke_feed((request.get_json(silent=True) or {}).get("token") or "")
+    return jsonify({"success": True})
+
+
+@app.route('/cal/<token>.ics')
+def calendar_ics(token):
+    schedule = calendar_feed.load_feed(token)
+    if schedule is None:
+        return Response("Không thấy lịch này.", status=404, mimetype="text/plain")
+    return Response(calendar_feed.build_ics(schedule), mimetype="text/calendar; charset=utf-8")
+
+
+@app.route('/api/calendar/google/status')
+def google_calendar_status():
+    return jsonify({"enabled": calendar_feed.oauth_enabled()})
+
+
+@app.route('/api/calendar/google/start')
+def google_calendar_start():
+    if not calendar_feed.oauth_enabled():
+        return jsonify({"success": False, "error": "Chưa cấu hình Google OAuth"}), 404
+    import secrets
+    state = secrets.token_urlsafe(16)
+    sid = request.cookies.get("ued_gcal") or secrets.token_urlsafe(18)
+    redirect_uri = request.host_url.rstrip("/") + "/api/calendar/google/callback"
+    response = app.redirect(calendar_feed.auth_url(redirect_uri, state))
+    response.set_cookie("ued_gcal", sid, httponly=True, samesite="Lax", max_age=180 * 24 * 3600)
+    response.set_cookie("ued_gcal_state", state, httponly=True, samesite="Lax", max_age=600)
+    return response
+
+
+@app.route('/api/calendar/google/callback')
+def google_calendar_callback():
+    if not calendar_feed.oauth_enabled():
+        return jsonify({"success": False, "error": "Chưa cấu hình Google OAuth"}), 404
+    if request.args.get("state") != request.cookies.get("ued_gcal_state"):
+        return Response("Phiên OAuth không khớp.", status=400)
+    import secrets
+    redirect_uri = request.host_url.rstrip("/") + "/api/calendar/google/callback"
+    token = calendar_feed.exchange_code(request.args.get("code") or "", redirect_uri)
+    sid = request.cookies.get("ued_gcal") or secrets.token_urlsafe(18)
+    calendar_feed.save_google(sid, token.get("refresh_token") or "")
+    response = app.redirect("/#lich")
+    response.set_cookie("ued_gcal", sid, httponly=True, samesite="Lax", max_age=180 * 24 * 3600)
+    return response
+
+
+@app.route('/api/calendar/google/sync', methods=['POST'])
+def google_calendar_sync():
+    if not calendar_feed.oauth_enabled():
+        return jsonify({"success": False, "error": "Chưa cấu hình Google OAuth"}), 404
+    data = request.get_json(silent=True) or {}
+    try:
+        count = calendar_feed.sync_events(request.cookies.get("ued_gcal") or "", data.get("schedule") or {})
+    except PermissionError as exc:
+        return jsonify({"success": False, "error": str(exc), "auth": "/api/calendar/google/start"}), 401
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 502
+    return jsonify({"success": True, "events": count})
+
+
+@app.route('/api/faculties')
 def api_faculties():
     return jsonify([f['khoa'] for f in db.stats()['faculties']])
 
@@ -693,6 +774,18 @@ def search_subject():
 def _run_ocr_file(path, mode):
     prepared = None
     try:
+        if mode in ("exam", "timetable"):
+            words = engines.computer_words(path)
+            parsed = schedule_ocr.parse_exam(words) if mode == "exam" else schedule_ocr.parse_timetable(words)
+            parsed["rows"] = schedule_ocr.attach_catalog(parsed.get("rows") or [])
+            return {
+                "success": True,
+                "mode": mode,
+                "rows": parsed["rows"],
+                "meta": {k: v for k, v in parsed.items() if k != "rows"},
+                "engine": "rapidocr-onnx",
+                "data": [],
+            }
         from ocr.prepare import PhotoPrepareError, looks_like_phone_capture, prepare_exif_image, prepare_phone_image
         use_phone = mode == 'phone' or (mode == 'computer' and looks_like_phone_capture(path))
         if use_phone:
