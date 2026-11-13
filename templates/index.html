@@ -54,20 +54,31 @@
             <button type="button" data-panel="muctieu">Mục tiêu</button>
             <button type="button" data-panel="lotrinh">Lộ trình</button>
             <button type="button" data-panel="lich">Lịch</button>
+            <button type="button" id="btnLookupMenu">Tra cứu</button>
             <button type="button" data-panel="drl">Điểm rèn luyện</button>
             <button type="button" data-panel="tintuc">Bảng tin</button>
             <button type="button" data-panel="huongdan">Hướng dẫn</button>
         </nav>
+        <button type="button" class="theme-btn" id="btnLookup" aria-label="Tra cứu môn học">
+            <i class="fas fa-search" aria-hidden="true"></i>
+        </button>
         <button type="button" class="theme-btn" id="themeBtn" aria-label="Đổi nền sáng hoặc tối">
             <i class="fas fa-moon" aria-hidden="true"></i>
         </button>
     </div>
 </header>
+<div id="reminderBanner" class="reminder-banner no-print" hidden></div>
 <main class="container py-4">
 <div id="guideHint" class="guide-hint no-print" hidden>
     <span>Mới dùng? Mở <button type="button" data-panel="huongdan">Hướng dẫn</button> để xem cách quét bảng điểm và tính CPA.</span>
     <button type="button" id="dismissGuideHint" aria-label="Đóng gợi ý">×</button>
 </div>
+<section id="shareView" class="card p-3 p-md-4 mb-3" hidden>
+    <h5 class="section-title">Bảng điểm được chia sẻ</h5>
+    <p class="small text-muted">Chỉ xem. Bảng trên máy bạn không bị ghi đè. Ai có liên kết này đều xem được điểm.</p>
+    <div id="shareBody"></div>
+    <button type="button" class="btn btn-sm btn-outline-ued mt-2" id="btnCloseShare">Đóng và về bảng của tôi</button>
+</section>
 <section id="panel-bangdiem" class="tool-panel">
     <div class="card p-3 mb-3 no-print">
         <div class="d-flex flex-wrap gap-2 align-items-center">
@@ -77,6 +88,7 @@
             <button type="button" class="btn btn-sm btn-outline-ued" id="btnProfileAdd">Thêm</button>
             <button type="button" class="btn btn-sm btn-outline-ued" id="btnProfileRename">Đổi tên</button>
             <button type="button" class="btn btn-sm btn-outline-danger" id="btnProfileDelete">Xóa hồ sơ</button>
+            <button type="button" class="btn btn-sm btn-outline-ued" id="btnShare">Chia sẻ</button>
             <span id="saveStamp" class="small text-muted ms-auto">Tự lưu trên máy</span>
         </div>
     </div>
@@ -105,6 +117,39 @@
         <h5 class="section-title mb-2"><i class="fas fa-chart-column"></i> GPA theo học kỳ</h5>
         <div class="chart-box"><canvas id="gpaChart" aria-label="Biểu đồ GPA học kỳ và CPA tích lũy"></canvas></div>
         <p id="chartEmpty" class="small text-muted mb-0">Thêm môn đã gắn năm học và học kỳ để vẽ cột GPA và đường CPA.</p>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-4">
+            <div class="card p-3 h-100" id="cardRetake">
+                <h5 class="section-title">Học lại để tăng CPA</h5>
+                <label class="form-label small" for="retakeTarget">Điểm mục tiêu</label>
+                <select id="retakeTarget" class="form-select form-select-sm mb-2">
+                    <option value="A" selected>A (4,0)</option>
+                    <option value="A+">A+ (4,0)</option>
+                    <option value="B+">B+ (3,5)</option>
+                    <option value="B">B (3,0)</option>
+                </select>
+                <div id="retakeOut" class="small"></div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card p-3 h-100" id="cardScholarship">
+                <h5 class="section-title">Học bổng khuyến khích</h5>
+                <p class="small text-muted">theo quy định hiện hành, có thể thay đổi</p>
+                <div class="row g-2 mb-2">
+                    <div class="col-7"><label class="form-label small" for="scholarDrl">Điểm rèn luyện kỳ này</label><input id="scholarDrl" class="form-control form-control-sm" type="number" min="0" max="100" placeholder="0–100"></div>
+                    <div class="col-5 d-flex align-items-end"><label class="small"><input id="scholarDiscipline" type="checkbox"> Kỷ luật</label></div>
+                </div>
+                <div id="scholarOut" class="small"></div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card p-3 h-100" id="cardWarning">
+                <h5 class="section-title">Cảnh báo học vụ</h5>
+                <div id="warningOut" class="small"></div>
+            </div>
+        </div>
     </div>
 
     <div class="row g-4">
@@ -399,6 +444,23 @@
                 <input id="ttStartDate" class="form-control form-control-sm mb-2" type="date">
                 <button type="button" class="btn btn-sm btn-outline-ued" id="btnIcs">Xuất tệp .ics</button>
                 <p class="small text-muted mt-2 mb-0">Tiết học lặp 15 tuần. Lịch thi là một sự kiện. Mở tệp bằng Lịch của điện thoại.</p>
+            </div>
+            <div class="card p-3" id="cardReminders">
+                <h5 class="section-title"><i class="fas fa-bell"></i> Nhắc lịch</h5>
+                <p class="small text-muted">Nhắc khi trình duyệt hoặc ứng dụng đang mở, hoặc khi service worker thức dậy. Không có máy chủ đẩy thông báo.</p>
+                <div class="d-flex flex-wrap gap-3 small mb-2">
+                    <label><input type="checkbox" id="leadDay" checked> Trước 1 ngày</label>
+                    <label><input type="checkbox" id="leadHour" checked> Trước 1 giờ</label>
+                </div>
+                <div class="row g-2 align-items-end mb-2">
+                    <div class="col-7"><label class="form-label small" for="deadlineTitle">Hạn đăng ký</label><input id="deadlineTitle" class="form-control form-control-sm" placeholder="Đăng ký học phần"></div>
+                    <div class="col-5"><label class="form-label small" for="deadlineWhen">Hạn</label><input id="deadlineWhen" class="form-control form-control-sm" type="datetime-local"></div>
+                </div>
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                    <button type="button" class="btn btn-sm btn-outline-ued" id="btnAddDeadline">Thêm hạn</button>
+                    <button type="button" class="btn btn-sm btn-ued" id="btnRemind">Bật nhắc</button>
+                </div>
+                <div id="deadlineList" class="small"></div>
             </div>
         </div>
     </div>
@@ -712,6 +774,28 @@
     · Bảng tin: bài công khai ued.udn.vn
 </footer>
 <div id="printPack" class="print-pack"></div>
+<div id="lookupModal" class="lookup-modal no-print" hidden>
+    <div class="lookup-sheet" role="dialog" aria-modal="true" aria-labelledby="lookupTitle">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 id="lookupTitle" class="section-title mb-0">Tra cứu môn</h5>
+            <button type="button" class="btn btn-sm btn-outline-ued" id="lookupClose">Đóng</button>
+        </div>
+        <input id="lookupInput" class="form-control mb-2" placeholder="Tên hoặc mã, không cần dấu. Phím / để mở" autocomplete="off">
+        <div id="lookupResults" class="lookup-results"></div>
+    </div>
+</div>
+<div id="shareModal" class="lookup-modal no-print" hidden>
+    <div class="lookup-sheet" role="dialog" aria-modal="true" aria-labelledby="shareTitle">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 id="shareTitle" class="section-title mb-0">Chia sẻ bảng điểm</h5>
+            <button type="button" class="btn btn-sm btn-outline-ued" id="shareClose">Đóng</button>
+        </div>
+        <p class="small text-warning-emphasis">Ai có liên kết này đều xem được điểm. Không gửi cho người lạ. Điểm nằm trên liên kết, không lưu trên máy chủ.</p>
+        <input id="shareLink" class="form-control form-control-sm mb-2" readonly>
+        <div id="shareQr" class="share-qr mb-2"></div>
+        <button type="button" class="btn btn-sm btn-ued" id="shareCopy">Sao chép liên kết</button>
+    </div>
+</div>
 <div id="cropModal" class="crop-modal" hidden>
     <div class="crop-sheet" role="dialog" aria-modal="true" aria-labelledby="cropTitle">
         <h5 id="cropTitle" class="section-title mb-1">Cắt ảnh trước khi quét</h5>
@@ -736,10 +820,12 @@
     </div>
 </div>
 <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/qrcode.js') }}"></script>
 <script src="{{ url_for('static', filename='crop.js') }}"></script>
 <script src="{{ url_for('static', filename='script.js') }}"></script>
 <script src="{{ url_for('static', filename='boards.js') }}"></script>
 <script src="{{ url_for('static', filename='academics-ui.js') }}"></script>
 <script src="{{ url_for('static', filename='studio.js') }}"></script>
+<script src="{{ url_for('static', filename='advise.js') }}"></script>
 </body>
 </html>

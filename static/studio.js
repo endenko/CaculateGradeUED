@@ -192,6 +192,7 @@
         clearTimeout(chartTimer);
         chartTimer = setTimeout(refreshChart, 200);
         if ($('panel-lotrinh') && !$('panel-lotrinh').hidden) loadRoadmap();
+        if (window.adviseRefresh) window.adviseRefresh();
     };
 
     async function loadPrograms() {

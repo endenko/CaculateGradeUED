@@ -236,3 +236,14 @@ html[data-theme="dark"] .ued-table thead th{background:#0b4ea2;color:#fff}
 html[data-theme="dark"] .btn-ued,html[data-theme="dark"] .btn-ued-dark{background:#0b4ea2;color:#fff}
 html[data-theme="dark"] .progress-bar{background:#f5b800;color:#062f66}
 html[data-theme="dark"] .exam-row{border-bottom-color:#243956}
+.reminder-banner{background:#fff6d6;color:#3b2a00;padding:.55rem 1rem;font-size:.9rem}
+.reminder-banner button{margin-left:.6rem;border:0;background:transparent;font-weight:800;color:#062f66}
+.lookup-modal{position:fixed;inset:0;z-index:80;background:rgba(6,47,102,.45);display:flex;align-items:flex-start;justify-content:center;padding:8vh 1rem 1rem}
+.lookup-modal[hidden]{display:none}
+.lookup-sheet{background:#fff;color:var(--text);border-radius:16px;padding:1rem;width:min(40rem,100%);max-height:80vh;overflow:auto;box-shadow:0 16px 40px rgba(6,47,102,.25)}
+.lookup-hit{padding:.55rem 0;border-bottom:1px solid #eef2f7}
+.share-qr svg{max-width:220px;height:auto;background:#fff}
+html[data-theme="dark"] .lookup-sheet{background:#14233a;color:#e7eef8}
+html[data-theme="dark"] .lookup-hit{border-bottom-color:#243956}
+html[data-theme="dark"] .reminder-banner{background:#3a2e10;color:#ffe7a3}
+html[data-theme="dark"] .reminder-banner button{color:#f5b800}

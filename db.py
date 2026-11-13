@@ -156,6 +156,7 @@ def seed_from_csv(csv_path=SEED_CSV, ued_csv=UED_CSV):
     finally:
         conn.close()
     _cache = None
+    clear_lookup_cache()
     print(f"[db] Seed: {n_hp} dòng học phần UED, {total} môn (tên duy nhất) vào {DB_PATH}")
     return total
 
@@ -210,6 +211,96 @@ def stats():
         }
     finally:
         conn.close()
+
+
+_lookup_cache = {}
+_course_index = None
+
+
+def _build_course_index():
+    from utils import normalize
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            """SELECT ma_hp, ten_mon, tin_chi, khoa, nganh FROM hoc_phan
+               WHERE nganh IS NOT NULL AND nganh != '' AND nganh != 'Danh sách gốc (repo)'"""
+        ).fetchall()
+    finally:
+        conn.close()
+    grouped = {}
+    for row in rows:
+        name = clean_course_name(row["ten_mon"])
+        item = grouped.get(name)
+        if item is None:
+            item = {
+                "ten_mon": name,
+                "ma_hp": row["ma_hp"] or "",
+                "tin_chi": row["tin_chi"],
+                "khoa": row["khoa"] or "",
+                "programs": [],
+                "norm": normalize(name),
+                "code": str(row["ma_hp"] or "").lower(),
+            }
+            grouped[name] = item
+        if row["ma_hp"] and not item["ma_hp"]:
+            item["ma_hp"] = row["ma_hp"]
+            item["code"] = str(row["ma_hp"]).lower()
+        program = row["nganh"]
+        if program and program not in item["programs"]:
+            item["programs"].append(program)
+    return list(grouped.values())
+
+
+def course_index():
+    global _course_index
+    if _course_index is None:
+        _course_index = _build_course_index()
+    return _course_index
+
+
+def lookup_courses(query, limit=12):
+    """Accent-insensitive lookup. Results are cached in this process."""
+    from utils import normalize
+    q = normalize(query)
+    if len(q) < 2:
+        return []
+    limit = max(1, min(int(limit or 12), 20))
+    key = (q, limit)
+    cached = _lookup_cache.get(key)
+    if cached is not None:
+        return cached
+    rows = course_index()
+    found = [row for row in rows if q in row["norm"] or (row["code"] and q in row["code"])]
+    found.sort(key=lambda row: (not row["norm"].startswith(q), len(row["norm"]), row["ten_mon"]))
+    if len(found) < limit:
+        try:
+            from rapidfuzz import fuzz, process
+            seen = {row["ten_mon"] for row in found}
+            for _match, score, idx in process.extract(q, [row["norm"] for row in rows], scorer=fuzz.WRatio, limit=limit * 2):
+                row = rows[idx]
+                if score >= 86 and row["ten_mon"] not in seen:
+                    found.append(row)
+                    seen.add(row["ten_mon"])
+        except ImportError:
+            pass
+    out = [{
+        "ten_mon": row["ten_mon"],
+        "ma_hp": row["ma_hp"],
+        "tin_chi": row["tin_chi"],
+        "khoa": row["khoa"],
+        "programs": row["programs"][:6],
+        "program_count": len(row["programs"]),
+    } for row in found[:limit]]
+    if len(_lookup_cache) > 64:
+        _lookup_cache.clear()
+    _lookup_cache[key] = out
+    return out
+
+
+def clear_lookup_cache():
+    global _course_index
+    _lookup_cache.clear()
+    _course_index = None
 
 
 def search_subjects(query, limit=20, khoa=None):

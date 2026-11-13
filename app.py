@@ -30,6 +30,7 @@ import ocr_queue
 import regulations
 import roadmap
 import solver
+import advising
 from ocr import engines
 from utils import no_accent_vietnamese, normalize
 from flask_limiter import Limiter
@@ -640,7 +641,34 @@ def offline_page():
     return send_from_directory(app.static_folder, 'offline.html')
 
 
-@app.route('/api/faculties')
+@app.route('/api/lookup')
+@limiter.limit("40 per minute", override_defaults=False)
+def api_lookup():
+    query = request.args.get('q', '')
+    try:
+        limit = int(request.args.get('limit') or 12)
+    except ValueError:
+        limit = 12
+    payload = db.lookup_courses(query, limit=limit)
+    response = jsonify(payload)
+    response.headers['Cache-Control'] = 'public, max-age=120'
+    return response
+
+
+@app.route('/api/advise', methods=['POST'])
+def api_advise():
+    data = request.get_json(silent=True) or {}
+    courses = data.get('courses') or []
+    program = data.get('program_credits') or 130
+    try:
+        return jsonify({
+            "success": True,
+            "retake": advising.retake_suggestions(courses, target=data.get('target') or 'A', top_n=int(data.get('top_n') or 5)),
+            "scholarship": advising.scholarship_report(courses, drl=data.get('drl'), discipline=bool(data.get('discipline')), program_credits=program),
+            "warning": advising.warning_report(courses, program_credits=program, rule=data.get('rule') or 'qd1586'),
+        })
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
 def api_faculties():
     return jsonify([f['khoa'] for f in db.stats()['faculties']])
 
@@ -716,12 +744,12 @@ ocr_queue.queue.set_runner(_run_ocr_file)
 
 
 @app.errorhandler(RateLimitExceeded)
-def _ocr_rate_limited(_exc):
-    return jsonify({
-        "success": False,
-        "accepted": False,
-        "error": "Bạn gửi ảnh OCR quá nhanh. Mỗi máy chỉ được 5 ảnh mỗi phút và 30 ảnh mỗi giờ. Đợi một lát rồi thử lại nhé.",
-    }), 429
+def _rate_limited(_exc):
+    if request.path.startswith('/api/lookup'):
+        message = "Bạn tra cứu môn quá nhanh. Đợi một lát rồi gõ tiếp."
+    else:
+        message = "Bạn gửi ảnh OCR quá nhanh. Mỗi máy chỉ được 5 ảnh mỗi phút và 30 ảnh mỗi giờ. Đợi một lát rồi thử lại nhé."
+    return jsonify({"success": False, "accepted": False, "error": message}), 429
 
 
 def _save_upload():
