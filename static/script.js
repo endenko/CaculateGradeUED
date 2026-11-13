@@ -61,6 +61,7 @@ function searchSubject() {
                         div.onclick = () => {
                             document.getElementById('inputName').value = item.ten_mon;
                             document.getElementById('inputCredits').value = item.tin_chi;
+                            document.getElementById('inputName').dataset.maHp = item.ma_hp || '';
                             box.style.display = 'none';
                         };
                         box.appendChild(div);
@@ -113,6 +114,7 @@ function addManualSubject() {
     if (name && credits && grade && !isNaN(score10)) {
         transcriptData.push({
             ten_mon: name, tin_chi: credits, diem_he_4: grade, diem_10: score10, sim_grade: null,
+            ma_hp: document.getElementById('inputName').dataset.maHp || '',
             nam_hoc: document.getElementById('inputYear').value,
             hoc_ky: document.getElementById('inputTerm').value,
             lan: parseInt(document.getElementById('inputAttempt').value, 10) || 1,

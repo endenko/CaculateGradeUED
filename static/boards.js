@@ -551,7 +551,7 @@
         const unknown = key === 'unknown';
         const [year, ky] = unknown ? [null, null] : key.split('|');
         t2.push(blank({
-            ten_mon: picked.ten_mon, tin_chi: picked.tin_chi,
+            ten_mon: picked.ten_mon, tin_chi: picked.tin_chi, ma_hp: picked.ma_hp || '',
             nam_hoc: year, hoc_ky: ky, term_unknown: unknown, in_progress: true,
         }));
         picked = null;

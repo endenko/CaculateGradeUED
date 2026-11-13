@@ -220,6 +220,44 @@
         if (saved) sel.value = saved;
     }
 
+    function roadmapCourses() {
+        const rows = [];
+        (window.transcriptData || []).forEach(course => rows.push({
+            ten_mon: course.ten_mon,
+            ma_hp: course.ma_hp || '',
+            tin_chi: course.tin_chi,
+            diem_he_4: course.diem_he_4,
+            diem_10: course.diem_10,
+            pass_only: !!course.pass_only,
+            in_progress: false,
+            source: 'bang1',
+        }));
+        const table2 = window.boardsSnapshot ? window.boardsSnapshot() : [];
+        table2.forEach(course => rows.push({
+            ten_mon: course.ten_mon,
+            ma_hp: course.ma_hp || '',
+            tin_chi: course.tin_chi,
+            letter: course.letter,
+            score10: course.score10,
+            in_progress: !!course.in_progress || (!course.letter && (course.score10 == null || course.score10 === '')),
+            source: 'bang2',
+        }));
+        return rows;
+    }
+
+    function statusLabel(status) {
+        if (status === 'dat') return 'Đã đạt';
+        if (status === 'dang_hoc') return 'Đang học';
+        return 'Còn thiếu';
+    }
+
+    function courseLine(row) {
+        return `<div class="road-line road-${row.status}">
+            <span><b>${esc(row.ten_mon)}</b> <span class="text-muted">${esc(row.ma_hp || '')}</span></span>
+            <span>${row.tin_chi || 0} TC · ${statusLabel(row.status)}</span>
+        </div>`;
+    }
+
     async function loadRoadmap() {
         const sel = $('programSelect');
         const box = $('roadSummary');
@@ -229,6 +267,7 @@
             $('roadDone').innerHTML = '';
             $('roadMiss').innerHTML = '';
             $('roadNote').textContent = '';
+            if ($('roadSems')) $('roadSems').innerHTML = '';
             return;
         }
         localStorage.setItem('ued_program', sel.value);
@@ -236,20 +275,47 @@
         const res = await fetch('/api/roadmap', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ nganh: sel.value, courses: window.transcriptData || [] }),
+            body: JSON.stringify({ nganh: sel.value, courses: roadmapCourses() }),
         });
         const data = await res.json();
         if (!data.found) {
             box.innerHTML = `<p class="text-danger small mb-0">${esc(data.error || 'Không thấy chương trình')}</p>`;
             return;
         }
+        const cap = data.tu_chon_toi_thieu != null ? ` · tự chọn tính ${data.elective_done_credits || 0}/${data.tu_chon_toi_thieu} TC` : '';
         box.innerHTML = `
             <div class="d-flex flex-wrap justify-content-between gap-2 mb-1">
                 <strong>${esc(data.nganh)}</strong>
                 <span>${data.percent}% · còn ${data.remaining_credits} TC</span>
             </div>
             <div class="progress mb-1"><div class="progress-bar" style="width:${data.percent}%">${data.percent}%</div></div>
-            <p class="small mb-0">${data.done_count}/${data.required_count} học phần · ${data.done_credits}/${data.required_credits} tín chỉ trong file CTĐT.</p>`;
+            <p class="small mb-0">Bắt buộc ${data.required_done_credits || 0}/${data.required_credits} TC${cap}. ${data.done_count} học phần đã đạt.</p>`;
+        const sems = $('roadSems');
+        const flat = $('roadFlat');
+        if (data.has_plan && sems) {
+            if (flat) flat.hidden = true;
+            sems.hidden = false;
+            const buttons = (data.semesters || []).map((sem, index) =>
+                `<button type="button" class="road-tab${index === 0 ? ' active' : ''}" data-hk="${sem.hoc_ky}">HK${sem.hoc_ky}</button>`
+            ).join('');
+            const panels = (data.semesters || []).map((sem, index) => {
+                const req = (sem.bat_buoc || []).map(courseLine).join('') || '<p class="small text-muted">Không có học phần bắt buộc.</p>';
+                const ele = (sem.tu_chon || []).map(courseLine).join('');
+                return `<div class="road-panel" data-hk="${sem.hoc_ky}" ${index ? 'hidden' : ''}>
+                    <p class="small mb-2">Học kỳ ${sem.hoc_ky}: ${sem.tin_chi_dat}/${sem.tin_chi} TC đã đạt${sem.tin_chi_ky ? ` · kế hoạch in trên CTĐT ${sem.tin_chi_ky} TC` : ''}.</p>
+                    <h6 class="text-ued">Bắt buộc</h6>${req}
+                    ${ele ? `<h6 class="text-ued mt-2">Tự chọn</h6>${ele}` : ''}
+                </div>`;
+            }).join('');
+            sems.innerHTML = `<div class="road-tabs">${buttons}</div>${panels}`;
+            sems.querySelectorAll('.road-tab').forEach(btn => btn.addEventListener('click', () => {
+                sems.querySelectorAll('.road-tab').forEach(el => el.classList.toggle('active', el === btn));
+                sems.querySelectorAll('.road-panel').forEach(el => { el.hidden = el.dataset.hk !== btn.dataset.hk; });
+            }));
+        } else if (sems) {
+            sems.innerHTML = '<p class="small text-muted">CTĐT chưa có thông tin phân kỳ. Danh sách dưới đây là toàn bộ học phần đã trích, chưa chia học kỳ.</p>';
+            if (flat) flat.hidden = false;
+        }
         const how = { ma_hp: 'mã', ten: 'tên', fuzzy: 'gần đúng' };
         $('roadDone').innerHTML = data.done.length
             ? data.done.map(item => `<tr><td>${esc(item.ten_mon)}</td><td class="text-center">${item.tin_chi}</td><td class="small">${how[item.how] || ''}</td></tr>`).join('')
@@ -257,8 +323,8 @@
         $('roadMiss').innerHTML = data.missing.length
             ? data.missing.map(item => `<tr><td>${esc(item.ten_mon)}</td><td class="text-center">${item.tin_chi}</td><td class="small">${esc(item.ma_hp)}</td></tr>`).join('')
             : '<tr><td colspan="3" class="text-success small">Đã khớp hết danh sách.</td></tr>';
-        const extra = (data.extra || []).filter(Boolean);
-        $('roadNote').textContent = (data.note || '') + (extra.length ? ` Môn đạt nhưng không nằm trong CTĐT này: ${extra.join(', ')}.` : '');
+        const source = data.nguon ? ` Nguồn: ${data.nguon}` : '';
+        $('roadNote').textContent = (data.note || '') + source;
     }
 
     function paintSchedule() {

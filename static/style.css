@@ -247,3 +247,13 @@ html[data-theme="dark"] .lookup-sheet{background:#14233a;color:#e7eef8}
 html[data-theme="dark"] .lookup-hit{border-bottom-color:#243956}
 html[data-theme="dark"] .reminder-banner{background:#3a2e10;color:#ffe7a3}
 html[data-theme="dark"] .reminder-banner button{color:#f5b800}
+.road-tabs{display:flex;gap:.35rem;overflow-x:auto;padding-bottom:.35rem}
+.road-tab{border:1px solid var(--ued-blue);background:#fff;color:var(--ued-blue);border-radius:999px;font-weight:700;padding:.28rem .7rem;white-space:nowrap}
+.road-tab.active{background:#0b4ea2;color:#fff}
+.road-line{display:flex;justify-content:space-between;gap:.6rem;padding:.4rem 0;border-bottom:1px solid #eef2f7}
+.road-dat span:last-child{color:#0b7a3e;font-weight:700}
+.road-dang_hoc span:last-child{color:#9a6b00;font-weight:700}
+.road-thieu span:last-child{color:#a32020;font-weight:700}
+html[data-theme="dark"] .road-tab{background:#0e1b2e;color:#d6e4ff}
+html[data-theme="dark"] .road-tab.active{background:#0b4ea2;color:#fff}
+html[data-theme="dark"] .road-line{border-bottom-color:#243956}
