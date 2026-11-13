@@ -1,0 +1,62 @@
+[
+ {
+  "ten_mon": "Triết học Mác - Lênin",
+  "tin_chi": 3,
+  "diem10": "7.5",
+  "diem_chu": "B"
+ },
+ {
+  "ten_mon": "Tư tưởng Hồ Chí Minh",
+  "tin_chi": 2,
+  "diem10": "8.2",
+  "diem_chu": "B+"
+ },
+ {
+  "ten_mon": "Giải tích 1",
+  "tin_chi": 3,
+  "diem10": "6.8",
+  "diem_chu": "C+"
+ },
+ {
+  "ten_mon": "Cơ sở văn hóa Việt Nam",
+  "tin_chi": 2,
+  "diem10": "9.1",
+  "diem_chu": "A+"
+ },
+ {
+  "ten_mon": "Tâm lý học đại cương",
+  "tin_chi": 3,
+  "diem10": "8.6",
+  "diem_chu": "A"
+ },
+ {
+  "ten_mon": "Hóa học đại cương",
+  "tin_chi": 2,
+  "diem10": "5.9",
+  "diem_chu": "C"
+ },
+ {
+  "ten_mon": "Lập trình Java",
+  "tin_chi": 3,
+  "diem10": "7.2",
+  "diem_chu": "B"
+ },
+ {
+  "ten_mon": "Văn học thiếu nhi",
+  "tin_chi": 4,
+  "diem10": "8.0",
+  "diem_chu": "B+"
+ },
+ {
+  "ten_mon": "Sinh học phân tử",
+  "tin_chi": 4,
+  "diem10": "6.1",
+  "diem_chu": "C"
+ },
+ {
+  "ten_mon": "Tiếng Anh B1.1",
+  "tin_chi": 3,
+  "diem10": "7.9",
+  "diem_chu": "B"
+ }
+]

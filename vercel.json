@@ -1,0 +1,4 @@
+{
+  "framework": "flask",
+  "functions": { "app.py": { "maxDuration": 60, "memory": 2048, "excludeFiles": "{uploads/**,tests/**,tools/**,.venv/**,LocalOCR.py,templates/index_ban_cu.html}" } }
+}
